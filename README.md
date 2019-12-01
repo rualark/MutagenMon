@@ -4,6 +4,7 @@ Cross-platform GUI for mutagen.io: monitor sessions status in tray, restart hang
 # Features
 
 - MutagenMon starts sessions specified in file `mutagen/mutagen-create.bat` and monitors their status
+- MutagenMon will restart a session if it freezes and cannot connect for some time
 - MutagenMon shows an icon in tray based on current sessions status (if multiple sessions are being monitored, worst status of all sessions is shown:
 
 <img src=https://i.imgur.com/mPu7mZq.png align=top width=30> Watching for changes (all ok)
@@ -18,7 +19,6 @@ Cross-platform GUI for mutagen.io: monitor sessions status in tray, restart hang
 
 <img src=https://i.imgur.com/YcvEENO.png align=top width=30> Mutagen cannot connect
 
-- MutagenMon will restart session if it freezes and cannot connect for some time
 - Click on MutagenMon icon in tray to see detailed status of each individual session:
 
 <img src=https://i.imgur.com/B9ljxT7.png>
