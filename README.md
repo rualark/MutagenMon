@@ -36,8 +36,9 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 1. Install python3
 2. Install wxpython: `pip install wxpython`
 3. Download and unzip <a href=https://github.com/rualark/MutagenMon/releases>MutagenMon release</a>
-3. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
-4. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
+4. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
+5. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
+6. Run `mutagenmon.pyw` with python3
 
 # Limitations
 
