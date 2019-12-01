@@ -605,14 +605,15 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                 if self.visual_merge(sname, fname, session_status):
                     return False
             if sel == 1:
-                if session_status[sname]['transport1'] == session_status[sname]['transport1']:
+                if session_status[sname]['transport1'] == session_status[sname]['transport2']:
                     messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
                 scp(
                     dir_and_name(session_status[sname]['url1'], fname),
                     dir_and_name(session_status[sname]['url2'], fname))
                 return False
             if sel == 2:
-                messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
+                if session_status[sname]['transport1'] == session_status[sname]['transport2']:
+                    messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
                 scp(
                     dir_and_name(session_status[sname]['url2'], fname),
                     dir_and_name(session_status[sname]['url1'], fname))
