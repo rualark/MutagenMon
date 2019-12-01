@@ -1,5 +1,5 @@
 # MutagenMon
-Cross-platform GUI for mutagen.io: monitor sessions status in tray, restart hanging sessions, resolve conflicts
+Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a>: monitor sessions status in tray, restart hanging sessions, resolve conflicts
 
 # Features
 
@@ -35,7 +35,8 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 
 1. Install python3
 2. Install wxpython: `pip install wxpython`
-3. Download mutagen.io and put mutagen binary into `mutagen` folder of MutagenMon
+3. Download and unzip <a href=https://github.com/rualark/MutagenMon/releases>MutagenMon release</a>
+3. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
 4. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
 
 # Limitations
