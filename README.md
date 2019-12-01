@@ -6,7 +6,25 @@ Cross-platform GUI for mutagen.io: monitor sessions status in tray, restart hang
 - MutagenMon starts sessions specified in file `mutagen/mutagen-create.bat` and monitors their status
 - MutagenMon shows an icon in tray based on current sessions status (if multiple sessions are being monitored, worst status of all sessions is shown:
 
-<img src=https://i.imgur.com/mPu7mZq.png width=30> Watching for changes
+<img src=https://i.imgur.com/mPu7mZq.png align=top width=30> Watching for changes (all ok)
+
+<img src=https://i.imgur.com/TLt1EDe.png align=top width=30> Syncing (scanning, reconciling, staging, applying changes or saving archive)
+
+<img src=https://i.imgur.com/tTMBScq.png align=top width=30> Conflicts detected (but no problems or errors)
+
+<img src=https://i.imgur.com/TzEpAsv.png align=top width=30> Problems detected
+
+<img src=https://i.imgur.com/Xayacab.png align=top width=30> Mutagen not running
+
+<img src=https://i.imgur.com/YcvEENO.png align=top width=30> Mutagen cannot connect
+
+- Click on MutagenMon icon in tray to see detailed status of each individual session:
+
+<img src=https://i.imgur.com/B9ljxT7.png>
+
+- If there are conflicts, you can investigate them, resolve visually using winmerge (on Windows) or other software - or choose winning side at once:
+
+<img src=https://i.imgur.com/d98x4xU.png>
 
 # Operating system support
 
