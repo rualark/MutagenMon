@@ -30,6 +30,22 @@ LOG_PATH = 'log'
 MUTAGEN_SESSIONS_BAT_FILE = 'mutagen/mutagen-create.bat'
 SESSION_MAX_ERRORS = 4
 
+status_connecting = (
+    'Connecting to',
+    'Waiting to connect',
+    'Unknown')
+status_working = (
+    'Scanning files',
+    'Waiting 5 seconds for rescan',
+    'Reconciling changes',
+    'Staging files on',
+    'Applying changes',
+    'Saving archive')
+status_ready = (
+    'Watching for changes')
+
+session_config = {}
+
 #####################
 #      HELPERS      #
 #####################
@@ -141,23 +157,6 @@ def run(ca, shell, interactive_error):
 #####################
 #      SCRIPT       #
 #####################
-
-status_connecting = (
-    'Connecting to',
-    'Waiting to connect',
-    'Unknown')
-status_working = (
-    'Scanning files',
-    'Waiting 5 seconds for rescan',
-    'Reconciling changes',
-    'Staging files on',
-    'Applying changes',
-    'Saving archive')
-status_ready = (
-    'Watching for changes')
-
-session_config = {}
-
 
 def make_diff_path(url, fname, id):
     if ':/' not in url:
@@ -515,7 +514,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         if worst_ok > 70:
             self.set_icon('img/green.png', TRAY_TOOLTIP + ': watching for changes')
         elif worst_ok > 60:
-            self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': working')
+            self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': syncing')
         elif worst_ok > 30:
             self.set_icon('img/green-conflict.png', TRAY_TOOLTIP + ': conflicts')
         elif worst_ok > 0:
