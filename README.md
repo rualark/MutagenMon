@@ -42,6 +42,7 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 
 # Limitations
 
+- Requires that session names are unique
 - Works only with local and ssh mutagen transports
 - File conflict resolving for local-local and ssh-ssh sessions currently works only if you edit merged file - "A wins" and "B wins" strategies do not currently work (I can fix it if you need it)
 
