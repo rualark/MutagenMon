@@ -14,21 +14,11 @@ from collections import defaultdict
 import threading
 import traceback
 import queue
+from config_mutagenmon.config_mutagenmon import *
 
 #####################
 #      CONFIG       #
 #####################
-
-DEBUG_LEVEL = 5
-START_ENABLED = True
-MERGE_PATH = r'C:\Program Files (x86)\WinMerge\WinMergeU'
-SCP_PATH = r'C:\Program Files\Git\usr\bin\scp'
-SSH_PATH = r'C:\Program Files\Git\usr\bin\ssh'
-MUTAGEN_PATH = r'mutagen\mutagen'
-TRAY_TOOLTIP = 'MutagenMon'
-LOG_PATH = 'log'
-MUTAGEN_SESSIONS_BAT_FILE = 'mutagen/mutagen-create.bat'
-SESSION_MAX_ERRORS = 4
 
 status_connecting = (
     'Connecting to',
@@ -49,6 +39,14 @@ session_config = {}
 #####################
 #      HELPERS      #
 #####################
+
+
+def my_excepthook(exctype, value, tb):
+    est = str(exctype) + '\n' + str(value) + '\n' + str(tb)
+    append_log(LOG_PATH + '/error.log', est)
+    errorBox('MutagenMon exception', est)
+
+sys.excepthook = my_excepthook
 
 
 def dir_and_name(dir, name):
@@ -131,15 +129,21 @@ def test_matching_open_parenth():
 
 
 def remote_escape(st):
+    return st.replace(' ', '\\ ').replace('(', '\\(').replace(')', '\\)').replace('&', '\\&')
+
+
+def escape_if_remote(st):
     if ':/' in st:
-        return st.replace(' ', '\\ ').replace('(', '\\(').replace(')', '\\)').replace('&', '\\&')
+        return remote_escape(st)
     else:
         return st
 
 
 def run(ca, shell, interactive_error):
+    append_debug_log(20, "RUN: " + str(ca))
     try:
         res = subprocess.check_output(ca, shell=shell, stderr=subprocess.STDOUT).decode("utf-8")
+        append_debug_log(20, "+RUN: " + str(ca) + ' ' + res)
         return res
     except subprocess.CalledProcessError as e:
         est = str(ca) + '\n' + e.output.decode("utf-8")
@@ -157,6 +161,7 @@ def run(ca, shell, interactive_error):
 #####################
 #      SCRIPT       #
 #####################
+
 
 def make_diff_path(url, fname, id):
     if ':/' not in url:
@@ -206,7 +211,7 @@ def errorBox(title, st):
 
 def scp(name1, name2):
     return run(
-        [SCP_PATH, remote_escape(name1), remote_escape(name2)],
+        [SCP_PATH, escape_if_remote(name1), escape_if_remote(name2)],
         shell=True,
         interactive_error=True)
 
@@ -225,6 +230,9 @@ def mutagen_sync_list():
         interactive_error=True)
     st = st.replace('Attempting to start Mutagen daemon...', '')
     st = st.replace('Started Mutagen daemon in background (terminate with "mutagen daemon stop")', '')
+    st = st.replace('\n\t', '\n    ')
+    st = re.sub(r"Identifier: .*?\n", "", st)
+    st = re.sub(r"Labels: .*?\n", "", st)
     st = st.strip()
     st = st.strip('-')
     st = formatted_current_datetime() + "\n" + st
@@ -269,7 +277,7 @@ def get_session_status():
             name = s[6:]
             # Detect if there are duplicate sessions with same name
             if name in session_status:
-                session_status[name]['duplicate'] = 1
+                session_status[name]['duplicate'] = "dupl"
         if s.startswith('Status: '):
             status = s[8:]
             session_status[name]['status'] = status
@@ -350,17 +358,18 @@ class Monitor(threading.Thread):
         self.data_lock = threading.Lock()
         self.mutagen_lock = threading.Lock()
         self.session_status = defaultdict(lambda: defaultdict(lambda: ''))
-        self.session_status = defaultdict(list)
-        self.session_errcount = defaultdict(lambda: 0)
+        self.session_status = defaultdict(lambda: defaultdict(lambda: ''))
+        self.session_err = defaultdict(lambda: 0)
+        self.session_laststatus = defaultdict(lambda: '')
+        self.conflicts = defaultdict(list)
         self.session_ok = defaultdict(lambda: 0)
         self.status_log = ''
         self.messages = queue.Queue()
         threading.Thread.__init__(self)
 
     def StopThread(self):
-        with self.data_lock:
-            self.enabled = False
-            self.stopping = 1
+        self.enabled = False
+        self.stopping = 1
 
     def RestartMutagen(self):
         if self.enabled:
@@ -395,13 +404,21 @@ class Monitor(threading.Thread):
         with self.data_lock:
             self.conflicts = conflicts_
 
-    def getErrCount(self):
+    def getErr(self):
         with self.data_lock:
-            return self.session_errcount
+            return self.session_err
 
-    def setErrCount(self, session_errcount_):
+    def setErr(self, session_err_):
         with self.data_lock:
-            self.session_errcount = session_errcount_
+            self.session_err = session_err_
+
+    def getLastStatus(self):
+        with self.data_lock:
+            return self.session_laststatus
+
+    def setLastStatus(self, session_laststatus_):
+        with self.data_lock:
+            self.session_laststatus = session_laststatus_
 
     def getOk(self):
         with self.data_lock:
@@ -426,54 +443,97 @@ class Monitor(threading.Thread):
                     if self.stopping:
                         return
                 self.update()
-                time.sleep(1)
+                self.restart_mutagen()
+                time.sleep(MUTAGEN_POLL_PERIOD / 1000.0)
         except Exception as e:
             append_log(LOG_PATH + '/error.log', traceback.format_exc())
             raise e
 
+    def restart_mutagen(self):
+        session_err = self.getErr()
+        session_log = self.getStatusLog()
+        session_status = self.getStatus()
+        if not self.getEnabled():
+            return
+        with self.mutagen_lock:
+            for sname in session_config:
+                status = session_status[sname]['status']
+                # Set session_ok to -1 if connecting for a long time or no session or duplicate
+                need_restart = False
+                restart_msg = ''
+                if not status:
+                    if session_err[sname] > SESSION_MAX_NOSESSION:
+                        need_restart = True
+                        restart_msg = 'Restarting'
+                elif session_status[sname]['duplicate']:
+                    if session_err[sname] > SESSION_MAX_DUPLICATE:
+                        need_restart = True
+                        restart_msg = 'Restarting duplicate'
+                        notify(sname, restart_msg + ': ' + session_status[sname]['status'])
+                elif status.startswith(status_connecting):
+                    if session_err[sname] > SESSION_MAX_ERRORS:
+                        need_restart = True
+                        restart_msg = 'Restarting connection'
+                        notify(sname, restart_msg + ': ' + session_status[sname]['status'])
+                if need_restart:
+                    append_log(LOG_PATH + '/restart.log',
+                               session_log + '\n' + restart_msg + ': ' + sname)
+                    restart_session(sname)
+                    session_err[sname] = 0
+        self.setErr(session_err)
+
     def update(self):
         (session_log, session_status, conflicts) = get_session_status()
         self.setStatusLog(session_log)
-        session_errcount = self.getErrCount()
+        session_err = self.getErr()
+        session_laststatus = self.getLastStatus()
         session_ok = self.getOk()
-        with self.mutagen_lock:
-            for sname in session_config:
-                append_debug_log(5, 'Status ' + sname + ': ' + format_dict(session_status[sname]))
-                status = session_status[sname]['status']
-                # Set session_ok to -1 if connecting for a long time or no session or duplicate
-                if not status or status.startswith(status_connecting) or session_status[sname]['duplicate']:
-                    session_errcount[sname] += 1
-                    if session_errcount[sname] > 1:
+        for sname in session_config:
+            status = session_status[sname]['status']
+            estatus = status + session_status[sname]['duplicate']
+            append_debug_log(5, 'Status ' + sname + ': ' + format_dict(session_status[sname]))
+            # Set session_ok to -1 if connecting for a long time or no session or duplicate
+            if not status or status.startswith(status_connecting) or session_status[sname]['duplicate']:
+                if session_laststatus[sname] == estatus:
+                    session_err[sname] += 1
+                    if session_err[sname] > 1:
                         if not status:
                             session_ok[sname] = -1
                         else:
                             session_ok[sname] = -2
-                    if session_errcount[sname] > SESSION_MAX_ERRORS:
-                        if self.getEnabled():
-                            if session_status[sname]['status']:
-                                notify(sname, 'Restarting: ' + session_status[sname]['status'])
-                            append_log(LOG_PATH + '/restart.log',
-                                        session_log + '\nRestarting: ' + sname)
-                            restart_session(sname)
-                            session_errcount[sname] = 0
-                # If ready, set session_ok to 100
-                elif status.startswith(status_ready):
-                    session_errcount[sname] = 0
-                    session_ok[sname] = 100
-                # If working, set session_ok to 70
-                elif status.startswith(status_working):
-                    session_errcount[sname] = 0
-                    session_ok[sname] = 70
-                # If there are problems, decrease session_ok to 30 if it is greater
-                if session_status[sname]['problems']:
-                    session_ok[sname] = min(session_ok[sname], 30)
-                # If there are conflicts, decrease session_ok to 60 if it is greater
-                if session_status[sname]['conflicts']:
-                    session_ok[sname] = min(session_ok[sname], 60)
+                else:
+                    session_err[sname] = 0
+            # If ready, set session_ok to 100
+            elif status.startswith(status_ready):
+                session_err[sname] = 0
+                session_ok[sname] = 100
+            # If working, set session_ok to 70
+            elif status.startswith(status_working):
+                session_err[sname] = 0
+                session_ok[sname] = 70
+            # If there are problems, decrease session_ok to 30 if it is greater
+            if session_status[sname]['problems']:
+                session_ok[sname] = min(session_ok[sname], 30)
+            # If there are conflicts, decrease session_ok to 60 if it is greater
+            if session_status[sname]['conflicts']:
+                session_ok[sname] = min(session_ok[sname], 60)
+            # Set last status
+            session_laststatus[sname] = estatus
         self.setStatus(session_status)
         self.setConflicts(conflicts)
-        self.setErrCount(session_errcount)
+        self.setErr(session_err)
+        self.setLastStatus(session_laststatus)
         self.setOk(session_ok)
+
+
+def resolve_log(sname, session_status, fname, method):
+    st = formatted_current_datetime() + '\n'
+    st += sname + '\n'
+    st += session_status[sname]['url1'] + '\n'
+    st += session_status[sname]['url2'] + '\n'
+    st += fname + '\n'
+    st += method + '\n'
+    append_log('log/resolve.log', st)
 
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
@@ -510,21 +570,29 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         return False
 
     def update(self, event):
+        append_debug_log(20, 'Updating worst_ok')
         worst_ok = self.get_worst_ok()
         if worst_ok > 70:
-            self.set_icon('img/green.png', TRAY_TOOLTIP + ': watching for changes')
+            self.set_icon('img/green.png', TRAY_TOOLTIP + ': mutagen is watching for changes')
         elif worst_ok > 60:
-            self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': syncing')
+            self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': mutagen is syncing')
         elif worst_ok > 30:
             self.set_icon('img/green-conflict.png', TRAY_TOOLTIP + ': conflicts')
         elif worst_ok > 0:
             self.set_icon('img/green-error.png', TRAY_TOOLTIP + ': problems')
         elif worst_ok == 0:
-            self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': waiting for status...')
+            self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': mutagen is waiting for status...')
         elif worst_ok == -1:
-            self.set_icon('img/darkgray.png', TRAY_TOOLTIP + ': not running')
+            if self.monitor.getEnabled():
+                self.set_icon('img/darkgray-restart.png', TRAY_TOOLTIP + ': mutagen is not running (restarting)')
+            else:
+                self.set_icon('img/darkgray.png', TRAY_TOOLTIP + ': mutagen is not running (disabled)')
         elif worst_ok == -2:
-            self.set_icon('img/orange.png', TRAY_TOOLTIP + ': error')
+            if self.monitor.getEnabled():
+                self.set_icon('img/orange-restart.png', TRAY_TOOLTIP + ': error (restarting)')
+            else:
+                self.set_icon('img/orange.png', TRAY_TOOLTIP + ': error (disabled)')
+        append_debug_log(10, 'Updated worst_ok: ' + str(worst_ok))
 
     def CreatePopupMenu(self):
         worst_ok = self.get_worst_ok()
@@ -536,9 +604,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         return menu
 
     def set_icon(self, path, title):
+        append_debug_log(30, 'set_icon')
         self.title = title
-        if self.cur_icon == path:
-            return
+        # if self.cur_icon == path:
+        #     return
         self.cur_icon = path
         icon = wx.Icon(path)
         self.SetIcon(icon, title)
@@ -603,24 +672,27 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             sel = dlg.GetSelection()
             if sel == 0:
                 if self.visual_merge(sname, fname, session_status):
-                    return False
+                    resolve_log(sname, session_status, fname, "Visual merge")
+                    return True
             if sel == 1:
                 if session_status[sname]['transport1'] == session_status[sname]['transport2']:
                     messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
                 scp(
                     dir_and_name(session_status[sname]['url1'], fname),
                     dir_and_name(session_status[sname]['url2'], fname))
-                return False
+                resolve_log(sname, session_status, fname, "A wins")
+                return True
             if sel == 2:
                 if session_status[sname]['transport1'] == session_status[sname]['transport2']:
                     messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
                 scp(
                     dir_and_name(session_status[sname]['url2'], fname),
                     dir_and_name(session_status[sname]['url1'], fname))
-                return False
+                resolve_log(sname, session_status, fname, "B wins")
+                return True
         if res == wx.ID_CANCEL:
-            return False
-        return True
+            return True
+        return False
 
     def resolve(self):
         session_status = self.monitor.getStatus()
@@ -637,10 +709,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                         'MutagenMon: resolve file conflict',
                         "Too many conflicts. You can restart resolving or resolve manually")
                     return
-                while self.resolve_single(sname, conflict, session_status):
+                while not self.resolve_single(sname, conflict, session_status):
                     pass
 
     def on_left_down(self, event):
+        append_debug_log(10, 'on_left_down')
         if self.has_ok(60):
             dlg = wx.MessageDialog(
                 self.frame,
@@ -660,12 +733,15 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             dlg.ShowModal()
 
     def on_start(self, event):
+        append_debug_log(10, 'on_start')
         self.monitor.RestartMutagen()
 
     def on_stop(self, event):
+        append_debug_log(10, 'on_stop')
         self.monitor.DisableMutagen()
 
     def on_exit(self, event):
+        append_debug_log(5, 'Exiting')
         self.monitor.StopThread()
         wx.CallAfter(self.Destroy)
         self.frame.Close()
