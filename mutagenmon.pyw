@@ -405,7 +405,7 @@ class Monitor(threading.Thread):
         self.conflicts = defaultdict(list)
         self.session_ok = defaultdict(lambda: 0)
         self.status_log = ''
-        self.autoresolve_history = {}
+        self.auto_resolve_history = {}
         self.messages = queue.Queue()
         threading.Thread.__init__(self)
 
@@ -574,27 +574,29 @@ class Monitor(threading.Thread):
         self.setOk(session_ok)
         self.setConflicts(conflicts)
 
-    def clean_autoresolve_history(self):
-        if not self.autoresolve_history:
+    def clean_auto_resolve_history(self):
+        if not self.auto_resolve_history:
             return
-        # print('History:', self.autoresolve_history)
+        # print('History:', self.auto_resolve_history)
         now = time.time()
-        for fname in list(self.autoresolve_history):
-            if self.autoresolve_history[fname] < now - AUTORESOLVE_HISTORY_AGE:
+        for fname in list(self.auto_resolve_history):
+            if self.auto_resolve_history[fname] < now - AUTORESOLVE_HISTORY_AGE:
                 append_debug_log(30, 'Removing from autoresolve history: ' + fname)
-                del self.autoresolve_history[fname]
+                del self.auto_resolve_history[fname]
 
     def auto_resolve(self):
-        self.clean_autoresolve_history()
+        self.clean_auto_resolve_history()
         conflicts = self.getConflicts()
+        now = time.time()
         for sname in conflicts:
             for conflict in conflicts[sname]:
-                self.auto_resolve_single(sname, conflict)
+                fname = conflict['aname']
+                if fname in self.auto_resolve_history:
+                    return
+                self.auto_resolve_history[fname] = now
+                self.auto_resolve_single(sname, conflict, fname)
 
-    def auto_resolve_single(self, sname, conflict):
-        fname = conflict['aname']
-        if fname in self.autoresolve_history:
-            return
+    def auto_resolve_single(self, sname, conflict, fname):
         for ar in AUTORESOLVE:
             result = re.search(ar['filepath'], fname)
             if result is None:
@@ -602,7 +604,6 @@ class Monitor(threading.Thread):
             session_status = self.getStatus()
             resolve(session_status, sname, fname, ar['resolve'], auto=True)
             notify(sname, 'Auto-resolved (' + ar['resolve'] + '): ' + fname)
-            self.autoresolve_history[fname] = time.time()
 
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
