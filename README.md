@@ -27,7 +27,7 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 <img src=https://i.imgur.com/B9ljxT7.png>
 
-- If there are conflicts, you can investigate them, resolve visually using winmerge (on Windows) or other software - or choose winning side at once:
+- If there are conflicts, you can investigate them, resolve visually using winmerge (on Windows) or other software - or choose winning side at once. Time and size of both files is shown. File with latest timestamp is selected automatically for resolution:
 
 <img src=https://i.imgur.com/d98x4xU.png>
 
