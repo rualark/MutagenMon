@@ -31,6 +31,8 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 <img src=https://i.imgur.com/d98x4xU.png>
 
+- MutagenMon can automatically resolve conflicts if you specify paths, where Alpha or Beta versions should always win. You will get desktop notification if conflict is resolved automatically.
+
 # Operating system support
 
 MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
