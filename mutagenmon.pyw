@@ -381,8 +381,6 @@ class Monitor(threading.Thread):
     def DisableMutagen(self):
         with self.data_lock:
             self.enabled = False
-        with self.mutagen_lock:
-            stop_sessions()
 
     def getEnabled(self):
         with self.data_lock:
@@ -444,17 +442,28 @@ class Monitor(threading.Thread):
                         return
                 self.update()
                 self.restart_mutagen()
+                self.stop_mutagen()
                 time.sleep(MUTAGEN_POLL_PERIOD / 1000.0)
         except Exception as e:
             append_log(LOG_PATH + '/error.log', traceback.format_exc())
             raise e
 
+    def stop_mutagen(self):
+        if self.getEnabled():
+            return
+        session_status = self.getStatus()
+        with self.mutagen_lock:
+            for sname in session_config:
+                status = session_status[sname]['status']
+                if status:
+                    stop_session(sname)
+
     def restart_mutagen(self):
+        if not self.getEnabled():
+            return
         session_err = self.getErr()
         session_log = self.getStatusLog()
         session_status = self.getStatus()
-        if not self.getEnabled():
-            return
         with self.mutagen_lock:
             for sname in session_config:
                 status = session_status[sname]['status']
@@ -573,7 +582,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         append_debug_log(20, 'Updating worst_ok')
         worst_ok = self.get_worst_ok()
         if worst_ok > 70:
-            self.set_icon('img/green.png', TRAY_TOOLTIP + ': mutagen is watching for changes')
+            if self.monitor.getEnabled():
+                self.set_icon('img/green.png', TRAY_TOOLTIP + ': mutagen is watching for changes')
+            else:
+                self.set_icon('img/green-stop.png', TRAY_TOOLTIP + ': mutagen is stopping')
         elif worst_ok > 60:
             self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': mutagen is syncing')
         elif worst_ok > 30:
