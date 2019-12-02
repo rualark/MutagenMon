@@ -15,7 +15,9 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 <img src=https://i.imgur.com/TzEpAsv.png align=top width=30> Problems detected
 
-<img src=https://i.imgur.com/Xayacab.png align=top width=30> Mutagen not running
+<img src=https://i.imgur.com/jHplJEG.png align=top width=30> Mutagen not running (restarting)
+
+<img src=https://i.imgur.com/Xayacab.png align=top width=30> Mutagen not running (disabled)
 
 <img src=https://i.imgur.com/YcvEENO.png align=top width=30> Mutagen cannot connect
 
