@@ -15,6 +15,7 @@ import threading
 import traceback
 import queue
 from config_mutagenmon.config_mutagenmon import *
+from shutil import copyfile
 
 #####################
 #      CONFIG       #
@@ -80,7 +81,7 @@ def append_log(fname, st):
     append_file(fname, '[' + format_current_datetime() + '] ' + str(st))
 
 
-def resolve_log(sname, session_status, fname, method, auto):
+def resolve_log(sname, session_status, fname, method, auto=False):
     st = ''
     if auto:
         st += ' (AUTO)'
@@ -226,6 +227,14 @@ def errorBox(title, st):
         wx.OK | wx.ICON_ERROR).ShowModal()
 
 
+def copy_local(name1, name2):
+    try:
+        copyfile(name1, name2)
+    except Exception as e:
+        est = 'Error copying file ' + name1 + ' to ' + name2 + ': ' + repr(e)
+        errorBox('MutagenMon error', est)
+        append_log(LOG_PATH + '/error.log', est)
+
 def scp(name1, name2):
     return run(
         [SCP_PATH, escape_if_remote(name1), escape_if_remote(name2)],
@@ -360,18 +369,17 @@ def stop_sessions():
 
 
 def resolve(session_status, sname, fname, method, auto=False):
-    if method == 'A wins':
-        id1 = '1'
-        id2 = '2'
+    fpath1 = dir_and_name(session_status[sname]['url1'], fname)
+    fpath2 = dir_and_name(session_status[sname]['url2'], fname)
+    if method == 'B wins':
+        fpath1, fpath2 = fpath2, fpath1
+    if session_status[sname]['transport1'] == 'local' and session_status[sname]['transport2'] == 'local':
+        copy_local(fpath1, fpath2)
+    elif session_status[sname]['transport1'] == 'ssh' and session_status[sname]['transport2'] == 'ssh':
+        scp(fpath1, 'cache/temp')
+        scp('cache/temp', fpath2)
     else:
-        id1 = '2'
-        id2 = '1'
-    if session_status[sname]['transport1'] == session_status[sname]['transport2']:
-        messageBox('Warning',
-                   'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
-    scp(
-        dir_and_name(session_status[sname]['url' + id1], fname),
-        dir_and_name(session_status[sname]['url' + id2], fname))
+        scp(fpath1, fpath2)
     resolve_log(sname, session_status, fname, method, auto)
 
 
@@ -405,10 +413,7 @@ class Monitor(threading.Thread):
         self.enabled = False
         self.stopping = 1
 
-    def RestartMutagen(self):
-        if self.enabled:
-            with self.mutagen_lock:
-                stop_sessions()
+    def StartMutagen(self):
         with self.data_lock:
             self.enabled = True
 
@@ -651,12 +656,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': mutagen is waiting for status...')
         elif worst_ok == -1:
             if self.monitor.getEnabled():
-                self.set_icon('img/darkgray-restart.png', TRAY_TOOLTIP + ': mutagen is not running (restarting)')
+                self.set_icon('img/darkgray-restart.png', TRAY_TOOLTIP + ': mutagen is not running (starting)')
             else:
                 self.set_icon('img/darkgray.png', TRAY_TOOLTIP + ': mutagen is not running (disabled)')
         elif worst_ok == -2:
             if self.monitor.getEnabled():
-                self.set_icon('img/orange-restart.png', TRAY_TOOLTIP + ': error (restarting)')
+                self.set_icon('img/orange-restart.png', TRAY_TOOLTIP + ': error (starting)')
             else:
                 self.set_icon('img/orange.png', TRAY_TOOLTIP + ': error (disabled)')
         append_debug_log(10, 'Updated worst_ok: ' + str(worst_ok))
@@ -664,7 +669,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
     def CreatePopupMenu(self):
         worst_ok = self.get_worst_ok()
         menu = wx.Menu()
-        create_menu_item(menu, 'Restart Mutagen sessions', self.on_start)
+        create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
         create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
         menu.AppendSeparator()
         create_menu_item(menu, 'Exit MutagenMon', self.on_exit)
@@ -693,6 +698,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                 scp(lname1, dir_and_name(session_status[sname]['url1'], fname))
             if session_status[sname]['transport2'] == 'ssh':
                 scp(lname1, dir_and_name(session_status[sname]['url2'], fname))
+            else:
+                copy_local(lname1, dir_and_name(session_status[sname]['url2'], fname))
             messageBox(
                 'MutagenMon: resolved file conflict',
                 'Merged file copied to both sides:\n\n' + fname
@@ -733,7 +740,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             st,
             'MutagenMon: resolve file conflict',
             ['Visual merge', 'A wins', 'B wins'],
-            style=wx.DEFAULT_DIALOG_STYLE | wx.OK | wx.CANCEL | wx.CENTRE)
+            style=wx.DEFAULT_DIALOG_STYLE | wx.OK | wx.CANCEL | wx.CENTRE | wx.OK_DEFAULT)
         if ftime1t > ftime2t:
             dlg.SetSelection(1)
         else:
@@ -795,7 +802,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
     def on_start(self, event):
         append_debug_log(10, 'on_start')
-        self.monitor.RestartMutagen()
+        self.monitor.StartMutagen()
 
     def on_stop(self, event):
         append_debug_log(10, 'on_stop')
