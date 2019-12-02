@@ -19,7 +19,9 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 <img src=https://i.imgur.com/Xayacab.png align=top width=30> Mutagen not running (disabled)
 
-<img src=https://i.imgur.com/YcvEENO.png align=top width=30> Mutagen cannot connect
+<img src=https://i.imgur.com/5UAKYvo.png align=top width=30> Mutagen cannot connect (restarting)
+
+<img src=https://i.imgur.com/YcvEENO.png align=top width=30> Mutagen cannot connect (disabled)
 
 - Click on MutagenMon icon in tray to see detailed status of each individual session:
 
