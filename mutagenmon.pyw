@@ -67,13 +67,30 @@ def append_file(fname, st):
         f.write(st + '\n')
 
 
-def formatted_current_datetime():
+def format_current_datetime():
     now = datetime.datetime.now()
     return now.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def format_datetime_from_timestamp(i):
+    return datetime.datetime.fromtimestamp(i).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def append_log(fname, st):
-    append_file(fname, '[' + formatted_current_datetime() + '] ' + str(st))
+    append_file(fname, '[' + format_current_datetime() + '] ' + str(st))
+
+
+def resolve_log(sname, session_status, fname, method, auto):
+    st = ''
+    if auto:
+        st += ' (AUTO)'
+    st += '\n'
+    st += sname + '\n'
+    st += session_status[sname]['url1'] + '\n'
+    st += session_status[sname]['url2'] + '\n'
+    st += fname + '\n'
+    st += method + '\n'
+    append_log('log/resolve.log', st)
 
 
 def format_dict(d):
@@ -172,7 +189,7 @@ def make_diff_path(url, fname, id):
 
 
 def append_debug_log(level, st):
-    st2 = '[' + formatted_current_datetime() + '] ' + str(st)
+    st2 = '[' + format_current_datetime() + '] ' + str(st)
     if level <= DEBUG_LEVEL:
         append_file(LOG_PATH + '/debug.log', st2)
         print(st2)
@@ -235,7 +252,7 @@ def mutagen_sync_list():
     st = re.sub(r"Labels: .*?\n", "", st)
     st = st.strip()
     st = st.strip('-')
-    st = formatted_current_datetime() + "\n" + st
+    st = format_current_datetime() + "\n" + st
     return st
 
 
@@ -342,12 +359,28 @@ def stop_sessions():
         stop_session(sname)
 
 
+def resolve(session_status, sname, fname, method, auto=False):
+    if method == 'A wins':
+        id1 = '1'
+        id2 = '2'
+    else:
+        id1 = '2'
+        id2 = '1'
+    if session_status[sname]['transport1'] == session_status[sname]['transport2']:
+        messageBox('Warning',
+                   'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
+    scp(
+        dir_and_name(session_status[sname]['url' + id1], fname),
+        dir_and_name(session_status[sname]['url' + id2], fname))
+    resolve_log(sname, session_status, fname, method, auto)
+
+
 def get_size_time_ssh(session_status, sname, i, fname):
     res = ssh_command(
         session_status[sname]['server' + str(i)],
-        "stat -c '%y %s' " + remote_escape(dir_and_name(session_status[sname]['dir' + str(i)], fname)))
-    ftime = res.split('.')[0].strip()
-    fsize = res.split(' ')[3].strip()
+        "stat -c '%Y %s' " + remote_escape(dir_and_name(session_status[sname]['dir' + str(i)], fname)))
+    ftime = int(res.split(' ')[0].strip())
+    fsize = int(res.split(' ')[1].strip())
     return fsize, ftime
 
 
@@ -364,6 +397,7 @@ class Monitor(threading.Thread):
         self.conflicts = defaultdict(list)
         self.session_ok = defaultdict(lambda: 0)
         self.status_log = ''
+        self.autoresolve_history = {}
         self.messages = queue.Queue()
         threading.Thread.__init__(self)
 
@@ -443,6 +477,7 @@ class Monitor(threading.Thread):
                 self.update()
                 self.restart_mutagen()
                 self.stop_mutagen()
+                self.auto_resolve()
                 time.sleep(MUTAGEN_POLL_PERIOD / 1000.0)
         except Exception as e:
             append_log(LOG_PATH + '/error.log', traceback.format_exc())
@@ -529,20 +564,40 @@ class Monitor(threading.Thread):
             # Set last status
             session_laststatus[sname] = estatus
         self.setStatus(session_status)
-        self.setConflicts(conflicts)
         self.setErr(session_err)
         self.setLastStatus(session_laststatus)
         self.setOk(session_ok)
+        self.setConflicts(conflicts)
 
+    def clean_autoresolve_history(self):
+        if not self.autoresolve_history:
+            return
+        # print('History:', self.autoresolve_history)
+        now = time.time()
+        for fname in list(self.autoresolve_history):
+            if self.autoresolve_history[fname] < now - AUTORESOLVE_HISTORY_AGE:
+                append_debug_log(30, 'Removing from autoresolve history: ' + fname)
+                del self.autoresolve_history[fname]
 
-def resolve_log(sname, session_status, fname, method):
-    st = formatted_current_datetime() + '\n'
-    st += sname + '\n'
-    st += session_status[sname]['url1'] + '\n'
-    st += session_status[sname]['url2'] + '\n'
-    st += fname + '\n'
-    st += method + '\n'
-    append_log('log/resolve.log', st)
+    def auto_resolve(self):
+        self.clean_autoresolve_history()
+        conflicts = self.getConflicts()
+        for sname in conflicts:
+            for conflict in conflicts[sname]:
+                self.auto_resolve_single(sname, conflict)
+
+    def auto_resolve_single(self, sname, conflict):
+        fname = conflict['aname']
+        if fname in self.autoresolve_history:
+            return
+        for ar in AUTORESOLVE:
+            result = re.search(ar['filepath'], fname)
+            if result is None:
+                continue
+            session_status = self.getStatus()
+            resolve(session_status, sname, fname, ar['resolve'], auto=True)
+            notify(sname, 'Auto-resolved (' + ar['resolve'] + '): ' + fname)
+            self.autoresolve_history[fname] = time.time()
 
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
@@ -653,19 +708,19 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         ftime2 = ''
         fsize2 = ''
         if session_status[sname]['transport1'] == 'ssh':
-            fsize1, ftime1 = get_size_time_ssh(session_status, sname, 1, fname)
+            fsize1, ftime1t = get_size_time_ssh(session_status, sname, 1, fname)
+            ftime1 = format_datetime_from_timestamp(ftime1t)
         else:
             fsize1 = os.path.getsize(dir_and_name(session_status[sname]['url1'], fname))
-            ftime1 = datetime.datetime.fromtimestamp(
-                os.path.getmtime(dir_and_name(session_status[sname]['url1'], fname))
-            ).strftime("%Y-%m-%d %H:%M:%S")
+            ftime1t = os.path.getmtime(dir_and_name(session_status[sname]['url1'], fname))
+            ftime1 = format_datetime_from_timestamp(ftime1t)
         if session_status[sname]['transport2'] == 'ssh':
-            fsize2, ftime2 = get_size_time_ssh(session_status, sname, 2, fname)
+            fsize2, ftime2t = get_size_time_ssh(session_status, sname, 2, fname)
+            ftime2 = format_datetime_from_timestamp(ftime2t)
         else:
             fsize2 = os.path.getsize(dir_and_name(session_status[sname]['url2'], fname))
-            ftime2 = datetime.datetime.fromtimestamp(
-                os.path.getmtime(dir_and_name(session_status[sname]['url2'], fname))
-            ).strftime("%Y-%m-%d %H:%M:%S")
+            ftime2t = os.path.getmtime(dir_and_name(session_status[sname]['url2'], fname))
+            ftime2 = format_datetime_from_timestamp(ftime2t)
         st = conflict['aname'] + '\n\n' + \
             'A: ' + session_status[sname]['url1'] + '\n' + \
             str(fsize1) + ' bytes, ' + str(ftime1) + '\n' + \
@@ -679,6 +734,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             'MutagenMon: resolve file conflict',
             ['Visual merge', 'A wins', 'B wins'],
             style=wx.DEFAULT_DIALOG_STYLE | wx.OK | wx.CANCEL | wx.CENTRE)
+        if ftime1t > ftime2t:
+            dlg.SetSelection(1)
+        else:
+            dlg.SetSelection(2)
         res = dlg.ShowModal()
         if res == wx.ID_OK:
             sel = dlg.GetSelection()
@@ -687,20 +746,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                     resolve_log(sname, session_status, fname, "Visual merge")
                     return True
             if sel == 1:
-                if session_status[sname]['transport1'] == session_status[sname]['transport2']:
-                    messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
-                scp(
-                    dir_and_name(session_status[sname]['url1'], fname),
-                    dir_and_name(session_status[sname]['url2'], fname))
-                resolve_log(sname, session_status, fname, "A wins")
+                resolve(session_status, sname, fname, 'A wins')
                 return True
             if sel == 2:
-                if session_status[sname]['transport1'] == session_status[sname]['transport2']:
-                    messageBox('Warning', 'Currently "A win" and "B win" strategies are not supported for local-local or ssh-ssh sessions. You can either use visual merge and change first file, or contribute to the project and rewrite code where you will find this message')
-                scp(
-                    dir_and_name(session_status[sname]['url2'], fname),
-                    dir_and_name(session_status[sname]['url1'], fname))
-                resolve_log(sname, session_status, fname, "B wins")
+                resolve(session_status, sname, fname, 'B wins')
                 return True
         if res == wx.ID_CANCEL:
             return True
