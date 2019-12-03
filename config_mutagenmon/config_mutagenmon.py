@@ -1,6 +1,12 @@
 # Set to 0 to disable logging to log/debug.log
 # Set to 100 to enable maximum logging to log/debug.log
-DEBUG_LEVEL = 100
+DEBUG_LEVEL = 70
+
+# Notify when mutagen is being restarted due to stuck connection
+NOTIFY_RESTART_CONNECTION = True
+
+# Notify when conflicts are detected
+NOTIFY_CONFLICTS = True
 
 # If MutagenMon should start enabled
 # (enabled means that it restarts mutagen sessions if they have errors or are not running)
@@ -31,3 +37,28 @@ SESSION_MAX_DUPLICATE = 2
 
 # Number of milliseconds to wait between polling 'mutagen sync list'
 MUTAGEN_POLL_PERIOD = 1000
+
+# Add records matching filenames:
+# filepath - specify regular expression to match whole path with directory and filename
+# resolve - specify 'A wins' or 'B wins' to choose conflict resolution behavior
+AUTORESOLVE = [
+    {
+        'filepath': r'/\.idea/',
+        'resolve': 'A wins'
+    },
+    {
+        'filepath': r'nohup\.out$',
+        'resolve': 'B wins'
+    },
+    {
+        'filepath': r'mut.st/con.*?2',
+        'resolve': 'A wins'
+    },
+    {
+        'filepath': r'mut.st/con.*?3',
+        'resolve': 'B wins'
+    }
+]
+
+# How long to remember autoresolved conflicts not to try to autoresolve them again (in seconds)
+AUTORESOLVE_HISTORY_AGE = 10

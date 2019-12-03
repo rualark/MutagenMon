@@ -16,6 +16,8 @@ import traceback
 import queue
 from config_mutagenmon.config_mutagenmon import *
 from shutil import copyfile
+import signal
+import time
 
 #####################
 #      CONFIG       #
@@ -40,6 +42,16 @@ session_config = {}
 #####################
 #      HELPERS      #
 #####################
+
+
+class GracefulKiller:
+  def __init__(self):
+     self.kill_now = False
+     signal.signal(signal.SIGINT, self.exit_gracefully)
+     signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self,signum, frame):
+     self.kill_now = True
 
 
 def my_excepthook(exctype, value, tb):
@@ -158,10 +170,10 @@ def escape_if_remote(st):
 
 
 def run(ca, shell, interactive_error):
-    append_debug_log(20, "RUN: " + str(ca))
+    append_debug_log(90, "RUN: " + str(ca))
     try:
         res = subprocess.check_output(ca, shell=shell, stderr=subprocess.STDOUT).decode("utf-8")
-        append_debug_log(20, "+RUN: " + str(ca) + ' ' + res)
+        append_debug_log(90, "+RUN: " + str(ca) + ' ' + res)
         return res
     except subprocess.CalledProcessError as e:
         est = str(ca) + '\n' + e.output.decode("utf-8")
@@ -175,6 +187,10 @@ def run(ca, shell, interactive_error):
             errorBox('MutagenMon error', est)
         append_log(LOG_PATH + '/error.log', est)
         return est
+
+
+def test_autoresolve():
+    test_fnames = [""]
 
 #####################
 #      SCRIPT       #
@@ -518,12 +534,19 @@ class Monitor(threading.Thread):
                     if session_err[sname] > SESSION_MAX_DUPLICATE:
                         need_restart = True
                         restart_msg = 'Restarting duplicate'
-                        notify(sname, restart_msg + ': ' + session_status[sname]['status'])
+                        self.messages.put({
+                            'type': 'notify',
+                            'title': sname,
+                            'text': restart_msg + ': ' + session_status[sname]['status']})
                 elif status.startswith(status_connecting):
                     if session_err[sname] > SESSION_MAX_ERRORS:
                         need_restart = True
                         restart_msg = 'Restarting connection'
-                        notify(sname, restart_msg + ': ' + session_status[sname]['status'])
+                        if NOTIFY_RESTART_CONNECTION:
+                            self.messages.put({
+                                'type': 'notify',
+                                'title': sname,
+                                'text': restart_msg + ': ' + session_status[sname]['status']})
                 if need_restart:
                     append_log(LOG_PATH + '/restart.log',
                                session_log + '\n' + restart_msg + ': ' + sname)
@@ -581,7 +604,7 @@ class Monitor(threading.Thread):
         now = time.time()
         for fname in list(self.auto_resolve_history):
             if self.auto_resolve_history[fname] < now - AUTORESOLVE_HISTORY_AGE:
-                append_debug_log(30, 'Removing from autoresolve history: ' + fname)
+                append_debug_log(10, 'Removing from autoresolve history: ' + fname)
                 del self.auto_resolve_history[fname]
 
     def auto_resolve(self):
@@ -603,22 +626,27 @@ class Monitor(threading.Thread):
                 continue
             session_status = self.getStatus()
             resolve(session_status, sname, fname, ar['resolve'], auto=True)
-            notify(sname, 'Auto-resolved (' + ar['resolve'] + '): ' + fname)
+            self.messages.put({
+                'type': 'notify',
+                'title': sname,
+                'text': 'Auto-resolved (' + ar['resolve'] + '): ' + fname})
 
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
     def __init__(self, frame):
+        self.killer = GracefulKiller()
         self.cur_icon = ''
-        self.menu_items = []
         self.frame = frame
         self.load_session_config()
         super(TaskBarIcon, self).__init__()
         self.title = ''
         self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': waiting for status...')
         self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
+        self.exiting = False
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.update, self.timer)
         self.timer.Start(1000)
+        self.cycle = 0
         self.monitor = Monitor(START_ENABLED)
         self.monitor.start()
 
@@ -639,8 +667,26 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                 return True
         return False
 
+    def get_messages(self):
+        try:
+            message = self.monitor.messages.get_nowait()
+            # messageBox('test', repr(message))
+            if message['type'] == 'notify':
+                self.ShowBalloon(message['title'], message['text'], msec=7000)
+        except:
+            pass
+
+    def check_killer(self):
+        if self.killer.kill_now:
+            self.exit()
+
     def update(self, event):
-        append_debug_log(20, 'Updating worst_ok')
+        if self.exiting:
+            return
+        self.check_killer()
+        self.get_messages()
+        self.cycle += 1
+        append_debug_log(90, 'Updating worst_ok')
         worst_ok = self.get_worst_ok()
         if worst_ok > 70:
             if self.monitor.getEnabled():
@@ -677,13 +723,28 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         return menu
 
     def set_icon(self, path, title):
-        append_debug_log(30, 'set_icon')
+        append_debug_log(40, 'Icon state 1: ' +
+                         str(self.IsAvailable()) +
+                         str(self.IsIconInstalled()) +
+                         str(self.IsOk()) +
+                         str(self.IsUnlinked()))
         self.title = title
-        # if self.cur_icon == path:
-        #     return
+        if self.cur_icon == path:
+            return
         self.cur_icon = path
         icon = wx.Icon(path)
         self.SetIcon(icon, title)
+        if not self.IsIconInstalled():
+            self.exiting = True
+            append_log(LOG_PATH + '/error.log', 'Icon crashed. Restarting application')
+            # self.ShowBalloon(self.title, 'Icon crashed. Restarting application', msec=7000)
+            subprocess.Popen(['mutagenmon.bat'], shell=True)
+            self.exit()
+        append_debug_log(40, 'Icon state 2: ' +
+                         str(self.IsAvailable()) +
+                         str(self.IsIconInstalled()) +
+                         str(self.IsOk()) +
+                         str(self.IsUnlinked()))
 
     def visual_merge(self, sname, fname, session_status):
         # Copy from remote
@@ -810,6 +871,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.monitor.DisableMutagen()
 
     def on_exit(self, event):
+        self.exit()
+
+    def exit(self):
         append_debug_log(5, 'Exiting')
         self.monitor.StopThread()
         wx.CallAfter(self.Destroy)
