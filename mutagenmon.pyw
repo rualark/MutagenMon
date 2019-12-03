@@ -724,6 +724,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         return cnames
 
     def notify_conflicts(self):
+        if not NOTIFY_CONFLICTS:
+            return
         cnames = self.get_conflict_names()
         print("CNAMES:", cnames)
         if cnames.difference(self.had_conflicts):
@@ -897,12 +899,34 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                 while not self.resolve_single(sname, conflict, session_status):
                     pass
 
+    def get_nice_log(self):
+        st = self.monitor.getStatusLog()
+        st = st.replace('Conflicts:', '')
+        st = re.sub(r"    \(α\).*?\n", "", st)
+        st = re.sub(r"    \(β\).*?\n", "", st)
+        #st = re.sub(r"    \(β\).*?$", "", st)
+        st = st.strip()
+        conflicts = self.monitor.getConflicts()
+        session_code = self.monitor.getCode()
+        cst = ''
+        for sname in session_config:
+            if session_code[sname] and conflicts[sname]:
+                for conflict in conflicts[sname]:
+                    if conflict['autoresolved']:
+                        cst += sname + ': ' + conflict['aname'] + ' [autoresolving]\n'
+                    else:
+                        cst += sname + ': ' + conflict['aname'] + '\n'
+        if cst:
+            st += "\n==================== CONFLICTS ====================\n" + cst
+        return st.strip()
+
     def on_left_down(self, event):
         append_debug_log(10, 'on_left_down')
+        st = self.get_nice_log()
         if self.get_conflict_names():
             dlg = wx.MessageDialog(
                 self.frame,
-                self.monitor.getStatusLog(),
+                st,
                 self.title,
                 wx.OK | wx.CANCEL | wx.ICON_QUESTION)
             dlg.SetOKCancelLabels("Resolve conflicts", "Cancel")
@@ -912,7 +936,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         else:
             dlg = wx.MessageDialog(
                 self.frame,
-                self.monitor.getStatusLog(),
+                st,
                 self.title,
                 wx.OK | wx.ICON_INFORMATION)
             dlg.ShowModal()

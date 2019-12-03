@@ -12,7 +12,7 @@ NOTIFY_RESTART_CONNECTION = True
 NOTIFY_CONFLICTS = True
 
 # Notify when conflicts are detected
-NOTIFY_AUTORESOLVE = False
+NOTIFY_AUTORESOLVE = True
 
 # If MutagenMon should start enabled
 # (enabled means that it restarts mutagen sessions if they have errors or are not running)
