@@ -221,6 +221,15 @@ def create_menu_item(menu, label, func):
     return item
 
 
+def info_message(st):
+    d = wx.Dialog(None, style=wx.CAPTION)
+    d.SetTitle(st)
+    d.SetSize((300, 50))
+    d.CenterOnScreen()
+    d.Show(True)
+    return d
+
+
 def notify(title, st):
     nm = wx.adv.NotificationMessage(title, st)
     # nm.MSWUseToasts("some_shortcut", "123")
@@ -399,6 +408,9 @@ def restart_session(sname):
 
 
 def resolve(session_status, sname, fname, method, auto=False):
+    imes = None
+    if not auto:
+        imes = info_message('Remote connection...')
     fpath1 = dir_and_name(session_status[sname]['url1'], fname)
     fpath2 = dir_and_name(session_status[sname]['url2'], fname)
     if method == 'B wins':
@@ -411,6 +423,8 @@ def resolve(session_status, sname, fname, method, auto=False):
     else:
         scp(fpath1, fpath2)
     resolve_log(sname, session_status, fname, method, auto)
+    if not auto:
+        imes.Destroy()
 
 
 def get_size_time_ssh(session_status, sname, i, fname):
@@ -812,21 +826,25 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                          str(self.IsUnlinked()))
 
     def visual_merge(self, sname, fname, session_status):
+        imes = info_message('Remote connection...')
         # Copy from remote
         lname1 = make_diff_path(session_status[sname]['url1'], fname, 1)
         lname2 = make_diff_path(session_status[sname]['url2'], fname, 2)
         old_mtime = os.path.getmtime(lname1)
+        imes.Destroy()
         # Run merge
         run_merge(lname1, lname2)
         # Check if file time changed
         new_mtime = os.path.getmtime(lname1)
         if new_mtime != old_mtime:
+            imes = info_message('Remote connection...')
             if session_status[sname]['transport1'] == 'ssh':
                 scp(lname1, dir_and_name(session_status[sname]['url1'], fname))
             if session_status[sname]['transport2'] == 'ssh':
                 scp(lname1, dir_and_name(session_status[sname]['url2'], fname))
             else:
                 copy_local(lname1, dir_and_name(session_status[sname]['url2'], fname))
+            imes.Destroy()
             messageBox(
                 'MutagenMon: resolved file conflict',
                 'Merged file copied to both sides:\n\n' + fname
@@ -841,6 +859,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         fsize1 = ''
         ftime2 = ''
         fsize2 = ''
+        imes = info_message('Remote connection...')
         if session_status[sname]['transport1'] == 'ssh':
             fsize1, ftime1t = get_size_time_ssh(session_status, sname, 1, fname)
             ftime1 = format_datetime_from_timestamp(ftime1t)
@@ -862,6 +881,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             'B: ' + session_status[sname]['url2'] + '\n' + \
             str(fsize2) + ' bytes, ' + str(ftime2) + '\n' + \
             conflict['bstate']
+        imes.Destroy()
         dlg = wx.SingleChoiceDialog(
             None,
             st,
