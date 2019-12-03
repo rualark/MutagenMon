@@ -18,6 +18,7 @@ from config_mutagenmon.config_mutagenmon import *
 from shutil import copyfile
 import signal
 import time
+from copy import copy, deepcopy
 
 #####################
 #      CONFIG       #
@@ -59,7 +60,8 @@ def my_excepthook(exctype, value, tb):
     append_log(LOG_PATH + '/error.log', est)
     errorBox('MutagenMon exception', est)
 
-sys.excepthook = my_excepthook
+if not DEBUG_EXCEPTIONS_TO_CONSOLE:
+    sys.excepthook = my_excepthook
 
 
 def dir_and_name(dir, name):
@@ -304,22 +306,38 @@ def start_session(sname):
         interactive_error = False)
 
 
+def init_session_dict():
+    return {x: {} for x in session_config}
+
+
+def init_session_list():
+    return {x: [] for x in session_config}
+
+
+def init_session_default(dflt):
+    return {x: dflt for x in session_config}
+
+
 def get_session_status():
     st = mutagen_sync_list()
     sa = st.splitlines()
     name = ''
     aname = ''
     astate = ''
-    session_status = defaultdict(lambda: defaultdict(lambda: ''))
-    conflicts = defaultdict(list)
+    session_status = init_session_dict()
+    conflicts = init_session_list()
     side = 0
     for s in sa:
         s = s.strip()
         if s.startswith('Name: '):
             name = s[6:]
             # Detect if there are duplicate sessions with same name
-            if name in session_status:
+            if session_status[name]:
                 session_status[name]['duplicate'] = "dupl"
+            else:
+                session_status[name]['duplicate'] = ''
+            session_status[name]['conflicts'] = 0
+            session_status[name]['problems'] = 0
         if s.startswith('Status: '):
             status = s[8:]
             session_status[name]['status'] = status
@@ -351,7 +369,8 @@ def get_session_status():
                 'aname': aname,
                 'bname': bname,
                 'astate': astate,
-                'bstate': bstate
+                'bstate': bstate,
+                'autoresolved': False
             })
     return st, session_status, conflicts
 
@@ -377,11 +396,6 @@ def get_sessions():
 def restart_session(sname):
     stop_session(sname)
     start_session(sname)
-
-
-def stop_sessions():
-    for sname in session_config:
-        stop_session(sname)
 
 
 def resolve(session_status, sname, fname, method, auto=False):
@@ -414,12 +428,12 @@ class Monitor(threading.Thread):
         self.enabled = enabled_
         self.data_lock = threading.Lock()
         self.mutagen_lock = threading.Lock()
-        self.session_status = defaultdict(lambda: defaultdict(lambda: ''))
-        self.session_status = defaultdict(lambda: defaultdict(lambda: ''))
-        self.session_err = defaultdict(lambda: 0)
-        self.session_laststatus = defaultdict(lambda: '')
-        self.conflicts = defaultdict(list)
-        self.session_ok = defaultdict(lambda: 0)
+        self.session_status = init_session_dict()
+        self.session_status = init_session_dict()
+        self.session_err = init_session_default(0)
+        self.session_laststatus = init_session_default('')
+        self.conflicts = init_session_list()
+        self.session_code = init_session_default(0)
         self.status_log = ''
         self.auto_resolve_history = {}
         self.messages = queue.Queue()
@@ -473,13 +487,13 @@ class Monitor(threading.Thread):
         with self.data_lock:
             self.session_laststatus = session_laststatus_
 
-    def getOk(self):
+    def getCode(self):
         with self.data_lock:
-            return self.session_ok
+            return self.session_code
 
-    def setOk(self, session_ok_):
+    def setCode(self, session_code_):
         with self.data_lock:
-            self.session_ok = session_ok_
+            self.session_code = session_code_
 
     def setStatusLog(self, status_log_):
         with self.data_lock:
@@ -498,10 +512,11 @@ class Monitor(threading.Thread):
                 self.update()
                 self.restart_mutagen()
                 self.stop_mutagen()
-                self.auto_resolve()
                 time.sleep(MUTAGEN_POLL_PERIOD / 1000.0)
         except Exception as e:
-            append_log(LOG_PATH + '/error.log', traceback.format_exc())
+            est = traceback.format_exc()
+            append_log(LOG_PATH + '/error.log', est)
+            errorBox('MutagenMon error', est)
             raise e
 
     def stop_mutagen(self):
@@ -510,6 +525,8 @@ class Monitor(threading.Thread):
         session_status = self.getStatus()
         with self.mutagen_lock:
             for sname in session_config:
+                if not session_status[sname]:
+                    continue
                 status = session_status[sname]['status']
                 if status:
                     stop_session(sname)
@@ -517,36 +534,37 @@ class Monitor(threading.Thread):
     def restart_mutagen(self):
         if not self.getEnabled():
             return
-        session_err = self.getErr()
+        session_err = copy(self.getErr())
         session_log = self.getStatusLog()
         session_status = self.getStatus()
         with self.mutagen_lock:
             for sname in session_config:
-                status = session_status[sname]['status']
-                # Set session_ok to -1 if connecting for a long time or no session or duplicate
+                # Set session_code to -1 if connecting for a long time or no session or duplicate
                 need_restart = False
                 restart_msg = ''
-                if not status:
+                if not session_status[sname]:
                     if session_err[sname] > SESSION_MAX_NOSESSION:
                         need_restart = True
                         restart_msg = 'Restarting'
-                elif session_status[sname]['duplicate']:
-                    if session_err[sname] > SESSION_MAX_DUPLICATE:
-                        need_restart = True
-                        restart_msg = 'Restarting duplicate'
-                        self.messages.put({
-                            'type': 'notify',
-                            'title': sname,
-                            'text': restart_msg + ': ' + session_status[sname]['status']})
-                elif status.startswith(status_connecting):
-                    if session_err[sname] > SESSION_MAX_ERRORS:
-                        need_restart = True
-                        restart_msg = 'Restarting connection'
-                        if NOTIFY_RESTART_CONNECTION:
+                else:
+                    status = session_status[sname]['status']
+                    if session_status[sname]['duplicate']:
+                        if session_err[sname] > SESSION_MAX_DUPLICATE:
+                            need_restart = True
+                            restart_msg = 'Restarting duplicate'
                             self.messages.put({
                                 'type': 'notify',
                                 'title': sname,
-                                'text': restart_msg + ': ' + session_status[sname]['status']})
+                                'text': restart_msg + ': ' + status})
+                    elif status.startswith(status_connecting):
+                        if session_err[sname] > SESSION_MAX_ERRORS:
+                            need_restart = True
+                            restart_msg = 'Restarting connection'
+                            if NOTIFY_RESTART_CONNECTION:
+                                self.messages.put({
+                                    'type': 'notify',
+                                    'title': sname,
+                                    'text': restart_msg + ': ' + status})
                 if need_restart:
                     append_log(LOG_PATH + '/restart.log',
                                session_log + '\n' + restart_msg + ': ' + sname)
@@ -557,44 +575,52 @@ class Monitor(threading.Thread):
     def update(self):
         (session_log, session_status, conflicts) = get_session_status()
         self.setStatusLog(session_log)
-        session_err = self.getErr()
-        session_laststatus = self.getLastStatus()
-        session_ok = self.getOk()
+        session_err = copy(self.getErr())
+        session_laststatus = copy(self.getLastStatus())
+        session_code = copy(self.getCode())
         for sname in session_config:
+            if not session_status[sname]:
+                estatus = ''
+                if session_laststatus[sname] == estatus:
+                    session_err[sname] += 1
+                    if session_err[sname] > 1:
+                        session_code[sname] = -1
+                else:
+                    session_err[sname] = 0
+                session_laststatus[sname] = estatus
+                continue
             status = session_status[sname]['status']
             estatus = status + session_status[sname]['duplicate']
             append_debug_log(5, 'Status ' + sname + ': ' + format_dict(session_status[sname]))
-            # Set session_ok to -1 if connecting for a long time or no session or duplicate
+            # Set session_code to -1 if connecting for a long time or no session or duplicate
             if not status or status.startswith(status_connecting) or session_status[sname]['duplicate']:
                 if session_laststatus[sname] == estatus:
                     session_err[sname] += 1
                     if session_err[sname] > 1:
-                        if not status:
-                            session_ok[sname] = -1
-                        else:
-                            session_ok[sname] = -2
+                        session_code[sname] = -2
                 else:
                     session_err[sname] = 0
-            # If ready, set session_ok to 100
+            # If ready, set session_code to 100
             elif status.startswith(status_ready):
                 session_err[sname] = 0
-                session_ok[sname] = 100
-            # If working, set session_ok to 70
+                session_code[sname] = 100
+            # If working, set session_code to 70
             elif status.startswith(status_working):
                 session_err[sname] = 0
-                session_ok[sname] = 70
-            # If there are problems, decrease session_ok to 30 if it is greater
+                session_code[sname] = 70
+            # If there are problems, decrease session_code to 30 if it is greater
             if session_status[sname]['problems']:
-                session_ok[sname] = min(session_ok[sname], 30)
-            # If there are conflicts, decrease session_ok to 60 if it is greater
+                session_code[sname] = min(session_code[sname], 30)
+            # If there are conflicts, decrease session_code to 60 if it is greater
             if session_status[sname]['conflicts']:
-                session_ok[sname] = min(session_ok[sname], 60)
+                session_code[sname] = min(session_code[sname], 60)
             # Set last status
             session_laststatus[sname] = estatus
         self.setStatus(session_status)
         self.setErr(session_err)
         self.setLastStatus(session_laststatus)
-        self.setOk(session_ok)
+        self.setCode(session_code)
+        self.auto_resolve(conflicts)
         self.setConflicts(conflicts)
 
     def clean_auto_resolve_history(self):
@@ -603,21 +629,23 @@ class Monitor(threading.Thread):
         # print('History:', self.auto_resolve_history)
         now = time.time()
         for fname in list(self.auto_resolve_history):
-            if self.auto_resolve_history[fname] < now - AUTORESOLVE_HISTORY_AGE:
+            if self.auto_resolve_history[fname][0] < now - AUTORESOLVE_HISTORY_AGE:
                 append_debug_log(10, 'Removing from autoresolve history: ' + fname)
                 del self.auto_resolve_history[fname]
 
-    def auto_resolve(self):
+    def auto_resolve(self, conflicts):
         self.clean_auto_resolve_history()
-        conflicts = self.getConflicts()
         now = time.time()
-        for sname in conflicts:
+        for sname in dict(conflicts):
             for conflict in conflicts[sname]:
                 fname = conflict['aname']
                 if fname in self.auto_resolve_history:
+                    conflict['autoresolved'] = self.auto_resolve_history[fname][1]
                     return
-                self.auto_resolve_history[fname] = now
-                self.auto_resolve_single(sname, conflict, fname)
+                self.auto_resolve_history[fname] = (
+                    now,
+                    self.auto_resolve_single(sname, conflict, fname))
+        print(conflicts)
 
     def auto_resolve_single(self, sname, conflict, fname):
         for ar in AUTORESOLVE:
@@ -626,10 +654,14 @@ class Monitor(threading.Thread):
                 continue
             session_status = self.getStatus()
             resolve(session_status, sname, fname, ar['resolve'], auto=True)
-            self.messages.put({
-                'type': 'notify',
-                'title': sname,
-                'text': 'Auto-resolved (' + ar['resolve'] + '): ' + fname})
+            conflict['autoresolved'] = True
+            if NOTIFY_AUTORESOLVE:
+                self.messages.put({
+                    'type': 'notify',
+                    'title': sname,
+                    'text': 'Auto-resolved (' + ar['resolve'] + '): ' + fname})
+            return True
+        return False
 
 
 class TaskBarIcon(wx.adv.TaskBarIcon):
@@ -644,35 +676,34 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
         self.exiting = False
         self.timer = wx.Timer(self)
+        self.had_conflicts = set()
         self.Bind(wx.EVT_TIMER, self.update, self.timer)
         self.timer.Start(1000)
         self.cycle = 0
         self.monitor = Monitor(START_ENABLED)
         self.monitor.start()
 
+    def notify(self, title, text):
+        if not self.ShowBalloon(title, text):
+            nm = wx.adv.NotificationMessage(title, text)
+            nm.Show()
+
     def load_session_config(self):
         get_sessions()
 
-    def get_worst_ok(self):
-        session_ok = self.monitor.getOk()
-        worst_ok = 100
+    def get_worst_code(self):
+        session_code = self.monitor.getCode()
+        worst_code = 100
         for sname in session_config:
-            worst_ok = min(worst_ok, session_ok[sname])
-        return worst_ok
-
-    def has_ok(self, code):
-        session_ok = self.monitor.getOk()
-        for sname in session_config:
-            if session_ok[sname] == code:
-                return True
-        return False
+            worst_code = min(worst_code, session_code[sname])
+        return worst_code
 
     def get_messages(self):
         try:
             message = self.monitor.messages.get_nowait()
             # messageBox('test', repr(message))
             if message['type'] == 'notify':
-                self.ShowBalloon(message['title'], message['text'], msec=7000)
+                self.notify(message['title'], message['text'])
         except:
             pass
 
@@ -680,41 +711,66 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         if self.killer.kill_now:
             self.exit()
 
+    def get_conflict_names(self):
+        conflicts = self.monitor.getConflicts()
+        session_code = self.monitor.getCode()
+        cnames = set()
+        for sname in session_config:
+            if session_code[sname] and conflicts[sname]:
+                for conflict in conflicts[sname]:
+                    if conflict['autoresolved']:
+                        continue
+                    cnames.add(sname + ':' + conflict['aname'])
+        return cnames
+
+    def notify_conflicts(self):
+        cnames = self.get_conflict_names()
+        print("CNAMES:", cnames)
+        if cnames.difference(self.had_conflicts):
+            cst = '\n'.join(cnames.difference(self.had_conflicts))
+            self.notify('New conflicts', cst)
+        if cnames:
+            self.had_conflicts = cnames
+
     def update(self, event):
         if self.exiting:
             return
+        self.cycle += 1
         self.check_killer()
         self.get_messages()
-        self.cycle += 1
-        append_debug_log(90, 'Updating worst_ok')
-        worst_ok = self.get_worst_ok()
-        if worst_ok > 70:
+        self.update_icon()
+        self.notify_conflicts()
+
+    def update_icon(self):
+        append_debug_log(90, 'Updating worst_code')
+        worst_code = self.get_worst_code()
+        if worst_code > 70:
             if self.monitor.getEnabled():
                 self.set_icon('img/green.png', TRAY_TOOLTIP + ': mutagen is watching for changes')
             else:
                 self.set_icon('img/green-stop.png', TRAY_TOOLTIP + ': mutagen is stopping')
-        elif worst_ok > 60:
+        elif worst_code > 60:
             self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': mutagen is syncing')
-        elif worst_ok > 30:
+        elif worst_code > 30:
             self.set_icon('img/green-conflict.png', TRAY_TOOLTIP + ': conflicts')
-        elif worst_ok > 0:
+        elif worst_code > 0:
             self.set_icon('img/green-error.png', TRAY_TOOLTIP + ': problems')
-        elif worst_ok == 0:
+        elif worst_code == 0:
             self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': mutagen is waiting for status...')
-        elif worst_ok == -1:
+        elif worst_code == -1:
             if self.monitor.getEnabled():
                 self.set_icon('img/darkgray-restart.png', TRAY_TOOLTIP + ': mutagen is not running (starting)')
             else:
                 self.set_icon('img/darkgray.png', TRAY_TOOLTIP + ': mutagen is not running (disabled)')
-        elif worst_ok == -2:
+        elif worst_code == -2:
             if self.monitor.getEnabled():
                 self.set_icon('img/orange-restart.png', TRAY_TOOLTIP + ': error (starting)')
             else:
                 self.set_icon('img/orange.png', TRAY_TOOLTIP + ': error (disabled)')
-        append_debug_log(10, 'Updated worst_ok: ' + str(worst_ok))
+        append_debug_log(10, 'Updated worst_code: ' + str(worst_code))
 
     def CreatePopupMenu(self):
-        worst_ok = self.get_worst_ok()
+        worst_code = self.get_worst_code()
         menu = wx.Menu()
         create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
         create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
@@ -723,7 +779,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         return menu
 
     def set_icon(self, path, title):
-        append_debug_log(40, 'Icon state 1: ' +
+        append_debug_log(85, 'Icon state 1: ' +
                          str(self.IsAvailable()) +
                          str(self.IsIconInstalled()) +
                          str(self.IsOk()) +
@@ -737,10 +793,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         if not self.IsIconInstalled():
             self.exiting = True
             append_log(LOG_PATH + '/error.log', 'Icon crashed. Restarting application')
-            # self.ShowBalloon(self.title, 'Icon crashed. Restarting application', msec=7000)
+            # self.notify(self.title, 'Icon crashed. Restarting application')
             subprocess.Popen(['mutagenmon.bat'], shell=True)
             self.exit()
-        append_debug_log(40, 'Icon state 2: ' +
+        append_debug_log(85, 'Icon state 2: ' +
                          str(self.IsAvailable()) +
                          str(self.IsIconInstalled()) +
                          str(self.IsOk()) +
@@ -827,7 +883,6 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
     def resolve(self):
         session_status = self.monitor.getStatus()
         conflicts = self.monitor.getConflicts()
-        self.monitor.setConflicts({})
         if not conflicts:
             return
         count = 0
@@ -844,7 +899,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
     def on_left_down(self, event):
         append_debug_log(10, 'on_left_down')
-        if self.has_ok(60):
+        if self.get_conflict_names():
             dlg = wx.MessageDialog(
                 self.frame,
                 self.monitor.getStatusLog(),

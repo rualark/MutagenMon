@@ -2,11 +2,17 @@
 # Set to 100 to enable maximum logging to log/debug.log
 DEBUG_LEVEL = 70
 
+# Do not show messageboxes with exceptions, instead print them to console
+DEBUG_EXCEPTIONS_TO_CONSOLE = True
+
 # Notify when mutagen is being restarted due to stuck connection
 NOTIFY_RESTART_CONNECTION = True
 
 # Notify when conflicts are detected
 NOTIFY_CONFLICTS = True
+
+# Notify when conflicts are detected
+NOTIFY_AUTORESOLVE = False
 
 # If MutagenMon should start enabled
 # (enabled means that it restarts mutagen sessions if they have errors or are not running)
