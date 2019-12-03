@@ -795,8 +795,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
     def CreatePopupMenu(self):
         menu = wx.Menu()
-        create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
-        create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
+        create_menu_item(menu, 'Show status', self.on_left_down)
+        if self.monitor.getEnabled():
+            create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
+        else:
+            create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
         menu.AppendSeparator()
         create_menu_item(menu, 'Exit MutagenMon', self.on_exit)
         return menu
