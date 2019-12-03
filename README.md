@@ -44,7 +44,8 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 3. Download and unzip <a href=https://github.com/rualark/MutagenMon/releases>MutagenMon release</a>
 4. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
 5. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
-6. Run `mutagenmon.pyw` with python3
+6. Edit configuration file at `mutagen/config/mutagenmon_config.json`
+6. Run mutagenmon
 
 # Limitations
 
