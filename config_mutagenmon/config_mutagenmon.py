@@ -1,9 +1,9 @@
 # Set to 0 to disable logging to log/debug.log
 # Set to 100 to enable maximum logging to log/debug.log
-DEBUG_LEVEL = 70
+DEBUG_LEVEL = 0
 
 # Do not show messageboxes with exceptions, instead print them to console
-DEBUG_EXCEPTIONS_TO_CONSOLE = True
+DEBUG_EXCEPTIONS_TO_CONSOLE = False
 
 # Notify when mutagen is being restarted due to stuck connection
 NOTIFY_RESTART_CONNECTION = True
@@ -67,4 +67,4 @@ AUTORESOLVE = [
 ]
 
 # How long to remember autoresolved conflicts not to try to autoresolve them again (in seconds)
-AUTORESOLVE_HISTORY_AGE = 10
+AUTORESOLVE_HISTORY_AGE = 30

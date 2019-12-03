@@ -591,7 +591,7 @@ class Monitor(threading.Thread):
                 continue
             status = session_status[sname]['status']
             estatus = status + session_status[sname]['duplicate']
-            append_debug_log(5, 'Status ' + sname + ': ' + format_dict(session_status[sname]))
+            append_debug_log(95, 'Status ' + sname + ': ' + format_dict(session_status[sname]))
             # Set session_code to -1 if connecting for a long time or no session or duplicate
             if not status or status.startswith(status_connecting) or session_status[sname]['duplicate']:
                 if session_laststatus[sname] == estatus:
@@ -620,7 +620,9 @@ class Monitor(threading.Thread):
         self.setErr(session_err)
         self.setLastStatus(session_laststatus)
         self.setCode(session_code)
+        append_debug_log(60, 'Conflicts1: ' + str(conflicts))
         self.auto_resolve(conflicts)
+        append_debug_log(60, 'Conflicts2: ' + str(conflicts))
         self.setConflicts(conflicts)
 
     def clean_auto_resolve_history(self):
@@ -628,26 +630,29 @@ class Monitor(threading.Thread):
             return
         # print('History:', self.auto_resolve_history)
         now = time.time()
-        for fname in list(self.auto_resolve_history):
-            if self.auto_resolve_history[fname][0] < now - AUTORESOLVE_HISTORY_AGE:
-                append_debug_log(10, 'Removing from autoresolve history: ' + fname)
-                del self.auto_resolve_history[fname]
+        for sfname in list(self.auto_resolve_history):
+            if self.auto_resolve_history[sfname][0] < now - AUTORESOLVE_HISTORY_AGE:
+                append_debug_log(10, 'Removing from autoresolve history: ' + sfname)
+                del self.auto_resolve_history[sfname]
 
     def auto_resolve(self, conflicts):
         self.clean_auto_resolve_history()
+        append_debug_log(40, 'ARHistory: ' + str(self.auto_resolve_history))
         now = time.time()
-        for sname in dict(conflicts):
+        for sname in conflicts:
             for conflict in conflicts[sname]:
                 fname = conflict['aname']
-                if fname in self.auto_resolve_history:
-                    conflict['autoresolved'] = self.auto_resolve_history[fname][1]
-                    return
-                self.auto_resolve_history[fname] = (
+                sfname = sname + ':' + fname
+                if sfname in self.auto_resolve_history:
+                    append_debug_log(60, 'Setting ' + sname + ':' + fname + ' = ' + str(self.auto_resolve_history[sfname][1]))
+                    conflict['autoresolved'] = self.auto_resolve_history[sfname][1]
+                    continue
+                self.auto_resolve_history[sfname] = (
                     now,
                     self.auto_resolve_single(sname, conflict, fname))
-        print(conflicts)
 
     def auto_resolve_single(self, sname, conflict, fname):
+        append_debug_log(60, 'Trying to autoresolve ' + sname + ':' + fname)
         for ar in AUTORESOLVE:
             result = re.search(ar['filepath'], fname)
             if result is None:
@@ -655,11 +660,13 @@ class Monitor(threading.Thread):
             session_status = self.getStatus()
             resolve(session_status, sname, fname, ar['resolve'], auto=True)
             conflict['autoresolved'] = True
+            est = 'Auto-resolved conflict: ' + ar['resolve']
+            append_debug_log(40, est + ' - ' + sname + ':' + fname)
             if NOTIFY_AUTORESOLVE:
                 self.messages.put({
                     'type': 'notify',
-                    'title': sname,
-                    'text': 'Auto-resolved (' + ar['resolve'] + '): ' + fname})
+                    'title': est,
+                    'text': sname + ': ' + fname})
             return True
         return False
 
@@ -668,6 +675,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
     def __init__(self, frame):
         self.killer = GracefulKiller()
         self.cur_icon = ''
+        self.worst_code = 0
         self.frame = frame
         self.load_session_config()
         super(TaskBarIcon, self).__init__()
@@ -727,11 +735,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         if not NOTIFY_CONFLICTS:
             return
         cnames = self.get_conflict_names()
-        print("CNAMES:", cnames)
+        append_debug_log(60, "CNAMES:" + str(cnames) + ' old: ' + str(self.had_conflicts))
         if cnames.difference(self.had_conflicts):
             cst = '\n'.join(cnames.difference(self.had_conflicts))
             self.notify('New conflicts', cst)
-        if cnames:
+        if cnames or self.worst_code == 100:
             self.had_conflicts = cnames
 
     def update(self, event):
@@ -745,34 +753,33 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
     def update_icon(self):
         append_debug_log(90, 'Updating worst_code')
-        worst_code = self.get_worst_code()
-        if worst_code > 70:
+        self.worst_code = self.get_worst_code()
+        if self.worst_code > 70:
             if self.monitor.getEnabled():
                 self.set_icon('img/green.png', TRAY_TOOLTIP + ': mutagen is watching for changes')
             else:
                 self.set_icon('img/green-stop.png', TRAY_TOOLTIP + ': mutagen is stopping')
-        elif worst_code > 60:
+        elif self.worst_code > 60:
             self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': mutagen is syncing')
-        elif worst_code > 30:
+        elif self.worst_code > 30:
             self.set_icon('img/green-conflict.png', TRAY_TOOLTIP + ': conflicts')
-        elif worst_code > 0:
+        elif self.worst_code > 0:
             self.set_icon('img/green-error.png', TRAY_TOOLTIP + ': problems')
-        elif worst_code == 0:
+        elif self.worst_code == 0:
             self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': mutagen is waiting for status...')
-        elif worst_code == -1:
+        elif self.worst_code == -1:
             if self.monitor.getEnabled():
                 self.set_icon('img/darkgray-restart.png', TRAY_TOOLTIP + ': mutagen is not running (starting)')
             else:
                 self.set_icon('img/darkgray.png', TRAY_TOOLTIP + ': mutagen is not running (disabled)')
-        elif worst_code == -2:
+        elif self.worst_code == -2:
             if self.monitor.getEnabled():
                 self.set_icon('img/orange-restart.png', TRAY_TOOLTIP + ': error (starting)')
             else:
                 self.set_icon('img/orange.png', TRAY_TOOLTIP + ': error (disabled)')
-        append_debug_log(10, 'Updated worst_code: ' + str(worst_code))
+        append_debug_log(40, 'Updated worst_code: ' + str(self.worst_code))
 
     def CreatePopupMenu(self):
-        worst_code = self.get_worst_code()
         menu = wx.Menu()
         create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
         create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
