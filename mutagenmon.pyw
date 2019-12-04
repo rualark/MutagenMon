@@ -789,8 +789,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             return
         self.cycle += 1
         self.check_killer()
-        self.get_messages()
         self.update_icon()
+        self.get_messages()
         self.notify_conflicts()
 
     def update_icon(self):
@@ -814,9 +814,14 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                     'img/green-stop.png',
                     cfg['TRAY_TOOLTIP'] + ': mutagen is stopping')
         elif self.worst_code > 60:
-            self.set_icon(
-                'img/green-sync.png',
-                cfg['TRAY_TOOLTIP'] + ': mutagen is syncing')
+            if now - session_log_time > cfg['STATUS_MAX_LAG']:
+                self.set_icon(
+                    'img/green-timeout.png',
+                    cfg['TRAY_TOOLTIP'] + ': mutagen is watching for changes (stale)')
+            else:
+                self.set_icon(
+                    'img/green-sync.png',
+                    cfg['TRAY_TOOLTIP'] + ': mutagen is syncing')
         elif self.worst_code > 30:
             self.set_icon(
                 'img/green-conflict.png',
@@ -866,8 +871,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             self.session_archive_time_grace_updated[sname] = False
             if not status[sname]:
                 continue
-            mtime = os.path.getmtime(
-                dir_and_name(cfg['MUTAGEN_PROFILE_DIR'], 'archives\\' + status[sname]['id']))
+            mtime = 0
+            try:
+                mtime = os.path.getmtime(
+                    dir_and_name(cfg['MUTAGEN_PROFILE_DIR'], 'archives\\' + status[sname]['id']))
+            except:
+                continue
             if not self.session_archive_time_grace[sname]:
                 self.session_archive_time_grace[sname] = mtime
                 continue

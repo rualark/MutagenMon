@@ -46,7 +46,7 @@
 "MUTAGEN_POLL_PERIOD": 1000,
 
 # Numer of seconds to allow for status lag before changing tray icon to "stale"
-"STATUS_MAX_LAG": 3,
+"STATUS_MAX_LAG": 4,
 
 # Set to mutagen directory with caches and archives
 "MUTAGEN_PROFILE_DIR": "%USERPROFILE%\\.mutagen",
