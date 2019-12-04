@@ -45,6 +45,21 @@
 # Number of milliseconds to wait between polling "mutagen sync list"
 "MUTAGEN_POLL_PERIOD": 1000,
 
+# Numer of seconds to allow for status lag before changing tray icon to "stale"
+"STATUS_MAX_LAG": 3,
+
+# Set to mutagen directory with caches and archives
+"MUTAGEN_PROFILE_DIR": "%USERPROFILE%\\.mutagen",
+
+# Watch mutagen profile dir for session updates (in seconds, or 0 to disable)
+"MUTAGEN_PROFILE_DIR_WATCH_PERIOD": 1,
+
+# Ignore more frequent session updates than this (in seconds)
+"MUTAGEN_PROFILE_GRACE": 4,
+
+# Show notifications fo mutagen session profile update
+"NOTIFY_MUTAGEN_PROFILE_UPDATE": true,
+
 # Add records matching filenames:
 # filepath - specify regular expression to match whole path with directory and filename
 # resolve - specify "A wins" or "B wins" to choose conflict resolution behavior

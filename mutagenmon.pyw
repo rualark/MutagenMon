@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 # This script uses python3
+# Optimized for mutagen.io version 0.10
 
 import wx.adv
 import wx
@@ -56,7 +57,7 @@ def load_config(fname):
     st = '\n'.join(fa)
     st = re.sub(r"#.*?\n", "", st)
     cfg = json.loads(st)
-
+    cfg['MUTAGEN_PROFILE_DIR'] = cfg['MUTAGEN_PROFILE_DIR'].replace("%USERPROFILE%", os.getenv("USERPROFILE"))
 
 load_config("config/config_mutagenmon.json")
 
@@ -83,10 +84,11 @@ if not cfg['DEBUG_EXCEPTIONS_TO_CONSOLE']:
 
 def dir_and_name(dir, name):
     # dir.replace("\\", '/')
-    if dir[:-1] == '/':
-        return dir + name
-    else:
-        return dir + '/' + name
+    if dir[-1:] == '/':
+        dir = dir[:-1]
+    if name[0] == '/':
+        name = name[1:]
+    return dir + '/' + name
 
 
 def write_file(fname, st):
@@ -295,7 +297,6 @@ def mutagen_sync_list():
     st = st.replace('Attempting to start Mutagen daemon...', '')
     st = st.replace('Started Mutagen daemon in background (terminate with "mutagen daemon stop")', '')
     st = st.replace('\n\t', '\n    ')
-    st = re.sub(r"Identifier: .*?\n", "", st)
     st = re.sub(r"Labels: .*?\n", "", st)
     st = st.strip()
     st = st.strip('-')
@@ -358,6 +359,8 @@ def get_session_status():
                 session_status[name]['duplicate'] = ''
             session_status[name]['conflicts'] = 0
             session_status[name]['problems'] = 0
+        if s.startswith('Identifier: '):
+            session_status[name]['id'] = s[12:]
         if s.startswith('Status: '):
             status = s[8:]
             session_status[name]['status'] = status
@@ -460,6 +463,7 @@ class Monitor(threading.Thread):
         self.conflicts = init_session_list()
         self.session_code = init_session_default(0)
         self.status_log = ''
+        self.status_log_time = 0
         self.auto_resolve_history = {}
         self.messages = queue.Queue()
         threading.Thread.__init__(self)
@@ -523,10 +527,11 @@ class Monitor(threading.Thread):
     def setStatusLog(self, status_log_):
         with self.data_lock:
             self.status_log = status_log_
+            self.status_log_time = time.time()
 
     def getStatusLog(self):
         with self.data_lock:
-            return self.status_log
+            return self.status_log, self.status_log_time
 
     def run(self):
         try:
@@ -560,7 +565,7 @@ class Monitor(threading.Thread):
         if not self.getEnabled():
             return
         session_err = copy(self.getErr())
-        session_log = self.getStatusLog()
+        session_log, session_log_time = self.getStatusLog()
         session_status = self.getStatus()
         with self.mutagen_lock:
             for sname in session_config:
@@ -598,7 +603,16 @@ class Monitor(threading.Thread):
         self.setErr(session_err)
 
     def update(self):
-        (session_log, session_status, conflicts) = get_session_status()
+        try:
+            (session_log, session_status, conflicts) = get_session_status()
+        except Exception as e:
+            est = traceback.format_exc()
+            append_log(cfg['LOG_PATH'] + '/error.log', est)
+            self.messages.put({
+                'type': 'notify',
+                'title': 'Error getting mutagen status',
+                'text': est})
+            return
         self.setStatusLog(session_log)
         session_err = copy(self.getErr())
         session_laststatus = copy(self.getLastStatus())
@@ -703,6 +717,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.worst_code = 0
         self.frame = frame
         self.load_session_config()
+        self.session_archive_time = init_session_default(0)
+        self.session_archive_time_grace = init_session_default(0)
+        self.session_archive_time_grace_updated = init_session_default(0)
         super(TaskBarIcon, self).__init__()
         self.title = ''
         self.set_icon('img/lightgray.png', cfg['TRAY_TOOLTIP'] + ': waiting for status...')
@@ -777,32 +794,93 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.notify_conflicts()
 
     def update_icon(self):
+        updated_profile = self.check_mutagen_profile_dir()
         append_debug_log(90, 'Updating worst_code')
         self.worst_code = self.get_worst_code()
-        if self.worst_code > 70:
+        now = time.time()
+        session_log, session_log_time = self.monitor.getStatusLog()
+        if self.worst_code > 70 and not updated_profile:
             if self.monitor.getEnabled():
-                self.set_icon('img/green.png', cfg['TRAY_TOOLTIP'] + ': mutagen is watching for changes')
+                if now - session_log_time > cfg['STATUS_MAX_LAG']:
+                    self.set_icon(
+                        'img/green-timeout.png',
+                        cfg['TRAY_TOOLTIP'] + ': mutagen is watching for changes (stale)')
+                else:
+                    self.set_icon(
+                        'img/green.png',
+                        cfg['TRAY_TOOLTIP'] + ': mutagen is watching for changes')
             else:
-                self.set_icon('img/green-stop.png', cfg['TRAY_TOOLTIP'] + ': mutagen is stopping')
+                self.set_icon(
+                    'img/green-stop.png',
+                    cfg['TRAY_TOOLTIP'] + ': mutagen is stopping')
         elif self.worst_code > 60:
-            self.set_icon('img/green-sync.png', cfg['TRAY_TOOLTIP'] + ': mutagen is syncing')
+            self.set_icon(
+                'img/green-sync.png',
+                cfg['TRAY_TOOLTIP'] + ': mutagen is syncing')
         elif self.worst_code > 30:
-            self.set_icon('img/green-conflict.png', cfg['TRAY_TOOLTIP'] + ': conflicts')
+            self.set_icon(
+                'img/green-conflict.png',
+                cfg['TRAY_TOOLTIP'] + ': conflicts')
         elif self.worst_code > 0:
-            self.set_icon('img/green-error.png', cfg['TRAY_TOOLTIP'] + ': problems')
+            self.set_icon(
+                'img/green-error.png',
+                cfg['TRAY_TOOLTIP'] + ': problems')
         elif self.worst_code == 0:
-            self.set_icon('img/lightgray.png', cfg['TRAY_TOOLTIP'] + ': mutagen is waiting for status...')
+            self.set_icon(
+                'img/lightgray.png',
+                cfg['TRAY_TOOLTIP'] + ': mutagen is waiting for status...')
         elif self.worst_code == -1:
             if self.monitor.getEnabled():
-                self.set_icon('img/darkgray-restart.png', cfg['TRAY_TOOLTIP'] + ': mutagen is not running (starting)')
+                self.set_icon(
+                    'img/darkgray-restart.png',
+                    cfg['TRAY_TOOLTIP'] + ': mutagen is not running (starting)')
             else:
-                self.set_icon('img/darkgray.png', cfg['TRAY_TOOLTIP'] + ': mutagen is not running (disabled)')
+                self.set_icon(
+                    'img/darkgray.png',
+                    cfg['TRAY_TOOLTIP'] + ': mutagen is not running (disabled)')
         elif self.worst_code == -2:
             if self.monitor.getEnabled():
-                self.set_icon('img/orange-restart.png', cfg['TRAY_TOOLTIP'] + ': error (starting)')
+                self.set_icon(
+                    'img/orange-restart.png',
+                    cfg['TRAY_TOOLTIP'] + ': error (starting)')
             else:
-                self.set_icon('img/orange.png', cfg['TRAY_TOOLTIP'] + ': error (disabled)')
+                self.set_icon(
+                    'img/orange.png',
+                    cfg['TRAY_TOOLTIP'] + ': error (disabled)')
         append_debug_log(40, 'Updated worst_code: ' + str(self.worst_code))
+        self.show_profile_updates()
+
+    def show_profile_updates(self):
+        for sname in session_config:
+            if self.session_archive_time_grace_updated[sname]:
+                self.notify('Updated', sname)
+
+    def check_mutagen_profile_dir(self):
+        if not cfg['MUTAGEN_PROFILE_DIR_WATCH_PERIOD']:
+            return
+        if self.cycle % cfg['MUTAGEN_PROFILE_DIR_WATCH_PERIOD']:
+            return
+        status = self.monitor.getStatus()
+        updating = False
+        for sname in session_config:
+            self.session_archive_time_grace_updated[sname] = False
+            if not status[sname]:
+                continue
+            mtime = os.path.getmtime(
+                dir_and_name(cfg['MUTAGEN_PROFILE_DIR'], 'archives\\' + status[sname]['id']))
+            if not self.session_archive_time_grace[sname]:
+                self.session_archive_time_grace[sname] = mtime
+                continue
+            if self.session_archive_time_grace[sname] + cfg['MUTAGEN_PROFILE_GRACE'] < mtime:
+                self.session_archive_time_grace[sname] = mtime
+                self.session_archive_time_grace_updated[sname] = True
+            if not self.session_archive_time[sname]:
+                self.session_archive_time[sname] = mtime
+                continue
+            if self.session_archive_time[sname] < mtime:
+                self.session_archive_time[sname] = mtime
+                updating = True
+        return updating
 
     def CreatePopupMenu(self):
         menu = wx.Menu()
@@ -941,11 +1019,14 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                     pass
 
     def get_nice_log(self):
-        st = self.monitor.getStatusLog()
+        st, session_log_time = self.monitor.getStatusLog()
         st = st.replace('Conflicts:', '')
+        st = re.sub(r"Identifier: .*?\n", "", st)
         st = re.sub(r"    \(α\).*?\n", "", st)
         st = re.sub(r"    \(β\).*?\n", "", st)
         #st = re.sub(r"    \(β\).*?$", "", st)
+        st = st.replace('\n\n', '\n')
+        st = st.replace('\n\n', '\n')
         st = st.strip()
         conflicts = self.monitor.getConflicts()
         session_code = self.monitor.getCode()
