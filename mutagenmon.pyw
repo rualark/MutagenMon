@@ -856,6 +856,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.show_profile_updates()
 
     def show_profile_updates(self):
+        if not cfg['NOTIFY_MUTAGEN_PROFILE_UPDATE']:
+            return
         for sname in session_config:
             if self.session_archive_time_grace_updated[sname]:
                 self.notify('Updated', sname)
