@@ -5,20 +5,18 @@
 import wx.adv
 import wx
 import os
-import time
 import sys
 import subprocess
 import datetime
 import re
-from collections import defaultdict
 import threading
 import traceback
 import queue
-from config_mutagenmon.config_mutagenmon import *
 from shutil import copyfile
 import signal
 import time
-from copy import copy, deepcopy
+import json
+from copy import copy
 
 #####################
 #      CONFIG       #
@@ -39,10 +37,28 @@ status_ready = (
     'Watching for changes')
 
 session_config = {}
+cfg = {}
 
 #####################
 #      HELPERS      #
 #####################
+
+
+def file_to_list_strip(filename):
+    with open(filename) as f:
+        fa = f.readlines()
+    return [x.strip() for x in fa]
+
+
+def load_config(fname):
+    global cfg
+    fa = file_to_list_strip(fname)
+    st = '\n'.join(fa)
+    st = re.sub(r"#.*?\n", "", st)
+    cfg = json.loads(st)
+
+
+load_config("config/config_mutagenmon.json")
 
 
 class GracefulKiller:
@@ -57,10 +73,11 @@ class GracefulKiller:
 
 def my_excepthook(exctype, value, tb):
     est = str(exctype) + '\n' + str(value) + '\n' + str(tb)
-    append_log(LOG_PATH + '/error.log', est)
+    append_log(cfg['LOG_PATH'] + '/error.log', est)
     errorBox('MutagenMon exception', est)
 
-if not DEBUG_EXCEPTIONS_TO_CONSOLE:
+
+if not cfg['DEBUG_EXCEPTIONS_TO_CONSOLE']:
     sys.excepthook = my_excepthook
 
 
@@ -133,12 +150,6 @@ def format_status(d):
     return st
 
 
-def file_to_list_strip(filename):
-    with open(filename) as f:
-        fa = f.readlines()
-    return [x.strip() for x in fa]
-
-
 def get_matching_open_parenth(st, i):
     stack = []
     for x in reversed(range(i)):
@@ -181,13 +192,13 @@ def run(ca, shell, interactive_error):
         est = str(ca) + '\n' + e.output.decode("utf-8")
         if interactive_error:
             errorBox('MutagenMon error', est)
-        append_log(LOG_PATH + '/error.log', est)
+        append_log(cfg['LOG_PATH'] + '/error.log', est)
         return est
     except Exception as e:
         est = str(ca) + '\n' + repr(e)
         if interactive_error:
             errorBox('MutagenMon error', est)
-        append_log(LOG_PATH + '/error.log', est)
+        append_log(cfg['LOG_PATH'] + '/error.log', est)
         return est
 
 
@@ -209,8 +220,8 @@ def make_diff_path(url, fname, id):
 
 def append_debug_log(level, st):
     st2 = '[' + format_current_datetime() + '] ' + str(st)
-    if level <= DEBUG_LEVEL:
-        append_file(LOG_PATH + '/debug.log', st2)
+    if level <= cfg['DEBUG_LEVEL']:
+        append_file(cfg['LOG_PATH'] + '/debug.log', st2)
         print(st2)
 
 
@@ -260,25 +271,25 @@ def copy_local(name1, name2):
     except Exception as e:
         est = 'Error copying file ' + name1 + ' to ' + name2 + ': ' + repr(e)
         errorBox('MutagenMon error', est)
-        append_log(LOG_PATH + '/error.log', est)
+        append_log(cfg['LOG_PATH'] + '/error.log', est)
 
 def scp(name1, name2):
     return run(
-        [SCP_PATH, escape_if_remote(name1), escape_if_remote(name2)],
+        [cfg['SCP_PATH'], escape_if_remote(name1), escape_if_remote(name2)],
         shell=True,
         interactive_error=True)
 
 
 def ssh_command(server, command):
     return run(
-        [SSH_PATH, server, command],
+        [cfg['SSH_PATH'], server, command],
         shell=True,
         interactive_error=True)
 
 
 def mutagen_sync_list():
     st = run(
-        [MUTAGEN_PATH, 'sync', 'list'],
+        [cfg['MUTAGEN_PATH'], 'sync', 'list'],
         shell=True,
         interactive_error=True)
     st = st.replace('Attempting to start Mutagen daemon...', '')
@@ -294,21 +305,21 @@ def mutagen_sync_list():
 
 def run_merge(name1, name2):
     return run(
-        [MERGE_PATH, name1, name2],
+        [cfg['MERGE_PATH'], name1, name2],
         shell = False,
         interactive_error = True)
 
 
 def stop_session(sname):
     return run(
-        [MUTAGEN_PATH, 'sync', 'terminate', sname],
+        [cfg['MUTAGEN_PATH'], 'sync', 'terminate', sname],
         shell = True,
         interactive_error = False)
 
 
 def start_session(sname):
     ca = session_config[sname].split()
-    ca[0] = MUTAGEN_PATH
+    ca[0] = cfg['MUTAGEN_PATH']
     return run(
         ca,
         shell = True,
@@ -386,7 +397,7 @@ def get_session_status():
 
 def get_sessions():
     global session_config
-    fa = file_to_list_strip(MUTAGEN_SESSIONS_BAT_FILE)
+    fa = file_to_list_strip(cfg['MUTAGEN_SESSIONS_BAT_FILE'])
     for s in fa:
         if s.startswith('rem '):
             continue
@@ -396,7 +407,7 @@ def get_sessions():
         sname = result.group(1)
         if sname:
             if sname in session_config:
-                dlg = wx.MessageDialog(None, sname + ' session name is duplicate in ' + MUTAGEN_SESSIONS_BAT_FILE, 'MutagenMon', wx.OK | wx.ICON_INFORMATION)
+                dlg = wx.MessageDialog(None, sname + ' session name is duplicate in ' + cfg['MUTAGEN_SESSIONS_BAT_FILE'], 'MutagenMon', wx.OK | wx.ICON_INFORMATION)
                 dlg.ShowModal()
                 dlg.Destroy()
             session_config[sname] = s
@@ -526,10 +537,10 @@ class Monitor(threading.Thread):
                 self.update()
                 self.restart_mutagen()
                 self.stop_mutagen()
-                time.sleep(MUTAGEN_POLL_PERIOD / 1000.0)
+                time.sleep(cfg['MUTAGEN_POLL_PERIOD'] / 1000.0)
         except Exception as e:
             est = traceback.format_exc()
-            append_log(LOG_PATH + '/error.log', est)
+            append_log(cfg['LOG_PATH'] + '/error.log', est)
             errorBox('MutagenMon error', est)
             raise e
 
@@ -557,13 +568,13 @@ class Monitor(threading.Thread):
                 need_restart = False
                 restart_msg = ''
                 if not session_status[sname]:
-                    if session_err[sname] > SESSION_MAX_NOSESSION:
+                    if session_err[sname] > cfg['SESSION_MAX_NOSESSION']:
                         need_restart = True
                         restart_msg = 'Restarting'
                 else:
                     status = session_status[sname]['status']
                     if session_status[sname]['duplicate']:
-                        if session_err[sname] > SESSION_MAX_DUPLICATE:
+                        if session_err[sname] > cfg['SESSION_MAX_DUPLICATE']:
                             need_restart = True
                             restart_msg = 'Restarting duplicate'
                             self.messages.put({
@@ -571,16 +582,16 @@ class Monitor(threading.Thread):
                                 'title': sname,
                                 'text': restart_msg + ': ' + status})
                     elif status.startswith(status_connecting):
-                        if session_err[sname] > SESSION_MAX_ERRORS:
+                        if session_err[sname] > cfg['SESSION_MAX_ERRORS']:
                             need_restart = True
                             restart_msg = 'Restarting connection'
-                            if NOTIFY_RESTART_CONNECTION:
+                            if cfg['NOTIFY_RESTART_CONNECTION']:
                                 self.messages.put({
                                     'type': 'notify',
                                     'title': sname,
                                     'text': restart_msg + ': ' + status})
                 if need_restart:
-                    append_log(LOG_PATH + '/restart.log',
+                    append_log(cfg['LOG_PATH'] + '/restart.log',
                                session_log + '\n' + restart_msg + ': ' + sname)
                     restart_session(sname)
                     session_err[sname] = 0
@@ -645,7 +656,7 @@ class Monitor(threading.Thread):
         # print('History:', self.auto_resolve_history)
         now = time.time()
         for sfname in list(self.auto_resolve_history):
-            if self.auto_resolve_history[sfname][0] < now - AUTORESOLVE_HISTORY_AGE:
+            if self.auto_resolve_history[sfname][0] < now - cfg['AUTORESOLVE_HISTORY_AGE']:
                 append_debug_log(10, 'Removing from autoresolve history: ' + sfname)
                 del self.auto_resolve_history[sfname]
 
@@ -667,7 +678,7 @@ class Monitor(threading.Thread):
 
     def auto_resolve_single(self, sname, conflict, fname):
         append_debug_log(60, 'Trying to autoresolve ' + sname + ':' + fname)
-        for ar in AUTORESOLVE:
+        for ar in cfg['AUTORESOLVE']:
             result = re.search(ar['filepath'], fname)
             if result is None:
                 continue
@@ -676,7 +687,7 @@ class Monitor(threading.Thread):
             conflict['autoresolved'] = True
             est = 'Auto-resolved conflict: ' + ar['resolve']
             append_debug_log(40, est + ' - ' + sname + ':' + fname)
-            if NOTIFY_AUTORESOLVE:
+            if cfg['NOTIFY_AUTORESOLVE']:
                 self.messages.put({
                     'type': 'notify',
                     'title': est,
@@ -694,7 +705,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.load_session_config()
         super(TaskBarIcon, self).__init__()
         self.title = ''
-        self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': waiting for status...')
+        self.set_icon('img/lightgray.png', cfg['TRAY_TOOLTIP'] + ': waiting for status...')
         self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
         self.exiting = False
         self.timer = wx.Timer(self)
@@ -702,7 +713,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.Bind(wx.EVT_TIMER, self.update, self.timer)
         self.timer.Start(1000)
         self.cycle = 0
-        self.monitor = Monitor(START_ENABLED)
+        self.monitor = Monitor(cfg['START_ENABLED'])
         self.monitor.start()
 
     def notify(self, title, text):
@@ -746,7 +757,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         return cnames
 
     def notify_conflicts(self):
-        if not NOTIFY_CONFLICTS:
+        if not cfg['NOTIFY_CONFLICTS']:
             return
         cnames = self.get_conflict_names()
         append_debug_log(60, "CNAMES:" + str(cnames) + ' old: ' + str(self.had_conflicts))
@@ -770,27 +781,27 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.worst_code = self.get_worst_code()
         if self.worst_code > 70:
             if self.monitor.getEnabled():
-                self.set_icon('img/green.png', TRAY_TOOLTIP + ': mutagen is watching for changes')
+                self.set_icon('img/green.png', cfg['TRAY_TOOLTIP'] + ': mutagen is watching for changes')
             else:
-                self.set_icon('img/green-stop.png', TRAY_TOOLTIP + ': mutagen is stopping')
+                self.set_icon('img/green-stop.png', cfg['TRAY_TOOLTIP'] + ': mutagen is stopping')
         elif self.worst_code > 60:
-            self.set_icon('img/green-sync.png', TRAY_TOOLTIP + ': mutagen is syncing')
+            self.set_icon('img/green-sync.png', cfg['TRAY_TOOLTIP'] + ': mutagen is syncing')
         elif self.worst_code > 30:
-            self.set_icon('img/green-conflict.png', TRAY_TOOLTIP + ': conflicts')
+            self.set_icon('img/green-conflict.png', cfg['TRAY_TOOLTIP'] + ': conflicts')
         elif self.worst_code > 0:
-            self.set_icon('img/green-error.png', TRAY_TOOLTIP + ': problems')
+            self.set_icon('img/green-error.png', cfg['TRAY_TOOLTIP'] + ': problems')
         elif self.worst_code == 0:
-            self.set_icon('img/lightgray.png', TRAY_TOOLTIP + ': mutagen is waiting for status...')
+            self.set_icon('img/lightgray.png', cfg['TRAY_TOOLTIP'] + ': mutagen is waiting for status...')
         elif self.worst_code == -1:
             if self.monitor.getEnabled():
-                self.set_icon('img/darkgray-restart.png', TRAY_TOOLTIP + ': mutagen is not running (starting)')
+                self.set_icon('img/darkgray-restart.png', cfg['TRAY_TOOLTIP'] + ': mutagen is not running (starting)')
             else:
-                self.set_icon('img/darkgray.png', TRAY_TOOLTIP + ': mutagen is not running (disabled)')
+                self.set_icon('img/darkgray.png', cfg['TRAY_TOOLTIP'] + ': mutagen is not running (disabled)')
         elif self.worst_code == -2:
             if self.monitor.getEnabled():
-                self.set_icon('img/orange-restart.png', TRAY_TOOLTIP + ': error (starting)')
+                self.set_icon('img/orange-restart.png', cfg['TRAY_TOOLTIP'] + ': error (starting)')
             else:
-                self.set_icon('img/orange.png', TRAY_TOOLTIP + ': error (disabled)')
+                self.set_icon('img/orange.png', cfg['TRAY_TOOLTIP'] + ': error (disabled)')
         append_debug_log(40, 'Updated worst_code: ' + str(self.worst_code))
 
     def CreatePopupMenu(self):
@@ -818,9 +829,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.SetIcon(icon, title)
         if not self.IsIconInstalled():
             self.exiting = True
-            append_log(LOG_PATH + '/error.log', 'Icon crashed. Restarting application')
+            append_log(cfg['LOG_PATH'] + '/error.log', 'Icon crashed. Restarting application')
             # self.notify(self.title, 'Icon crashed. Restarting application')
-            subprocess.Popen(['mutagenmon.bat'], shell=True)
+            subprocess.Popen(['mutagenmon'], shell=True)
             self.exit()
         append_debug_log(85, 'Icon state 2: ' +
                          str(self.IsAvailable()) +
