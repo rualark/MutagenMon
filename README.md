@@ -37,7 +37,15 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 
-# Installation
+# Installation on Windows
+
+1. Download and unzip <a href=https://github.com/rualark/MutagenMon/releases>MutagenMon release</a>
+2. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
+3. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
+4. Edit configuration file at `mutagen/config/mutagenmon_config.json`
+5. Run mutagenmon
+
+# Installation from sources
 
 1. Install python3
 2. Install wxpython: `pip install wxpython`
@@ -45,7 +53,7 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 4. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
 5. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
 6. Edit configuration file at `mutagen/config/mutagenmon_config.json`
-6. Run mutagenmon
+7. Run mutagenmon
 
 # Limitations
 
