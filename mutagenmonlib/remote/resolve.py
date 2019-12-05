@@ -1,11 +1,12 @@
 import wx.adv
 
-from .monitor import *
 from .ssh import *
 
 
-def resolve(session_status, sname, fname, method):
+def resolve(session_status, sname, fname, method, auto=False):
     imes = None
+    if not auto:
+        imes = info_message('Remote connection...')
     fpath1 = dir_and_name(session_status[sname]['url1'], fname)
     fpath2 = dir_and_name(session_status[sname]['url2'], fname)
     if method.startswith('B wins'):
@@ -17,7 +18,9 @@ def resolve(session_status, sname, fname, method):
         scp('cache/temp', fpath2)
     else:
         scp(fpath1, fpath2)
-    resolve_log(sname, session_status, fname, method)
+    resolve_log(sname, session_status, fname, method, auto)
+    if not auto:
+        imes.Destroy()
 
 
 def visual_merge(sname, fname, session_status):
@@ -119,14 +122,4 @@ def resolve_all(session_status, conflicts):
             while not resolve_single(sname, conflict, session_status):
                 pass
 
-
-def get_conflict_names(conflicts, session_code):
-    cnames = set()
-    for sname in session_config():
-        if session_code[sname] and conflicts[sname]:
-            for conflict in conflicts[sname]:
-                if conflict['autoresolved']:
-                    continue
-                cnames.add(sname + ':' + conflict['aname'])
-    return cnames
 

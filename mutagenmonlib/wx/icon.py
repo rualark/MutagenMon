@@ -2,6 +2,7 @@ import wx.adv
 import signal
 
 from ..remote.resolve import *
+from ..remote.monitor import *
 
 
 class GracefulKiller:

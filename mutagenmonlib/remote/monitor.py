@@ -271,9 +271,7 @@ class Monitor(threading.Thread):
             result = re.search(ar['filepath'], fname)
             if result is None:
                 continue
-            imes = info_message('Remote connection...')
-            resolve(session_status, sname, fname, ar['resolve'] + ' (auto)')
-            imes.Destroy()
+            resolve(session_status, sname, fname, ar['resolve'], auto=True)
             conflict['autoresolved'] = True
             est = 'Auto-resolved conflict: ' + ar['resolve']
             append_debug_log(40, est + ' - ' + sname + ':' + fname)

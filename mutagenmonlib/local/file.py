@@ -51,8 +51,10 @@ def append_log(fname, st):
     append_file(fname, '[' + format_current_datetime() + '] ' + str(st))
 
 
-def resolve_log(sname, session_status, fname, method):
+def resolve_log(sname, session_status, fname, method, auto=False):
     st = ''
+    if auto:
+        st += ' [AUTO]'
     st += '\n'
     st += sname + '\n'
     st += session_status[sname]['url1'] + '\n'

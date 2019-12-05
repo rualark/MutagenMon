@@ -139,3 +139,14 @@ def get_worst_code(session_code):
         worst_code = min(worst_code, session_code[sname])
     return worst_code
 
+
+def get_conflict_names(conflicts, session_code):
+    cnames = set()
+    for sname in session_config():
+        if session_code[sname] and conflicts[sname]:
+            for conflict in conflicts[sname]:
+                if conflict['autoresolved']:
+                    continue
+                cnames.add(sname + ':' + conflict['aname'])
+    return cnames
+
