@@ -734,9 +734,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.monitor.start()
 
     def notify(self, title, text):
-        if not self.ShowBalloon(title, text):
-            nm = wx.adv.NotificationMessage(title, text)
-            nm.Show()
+        try:
+            if not self.ShowBalloon(title, text):
+                nm = wx.adv.NotificationMessage(title, text)
+                nm.Show()
+        except:
+            pass
 
     def load_session_config(self):
         get_sessions()
@@ -878,6 +881,9 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                 mtime = os.path.getmtime(
                     dir_and_name(cfg['MUTAGEN_PROFILE_DIR'], 'archives\\' + status[sname]['id']))
             except:
+                # Reset timestamp to ignore first change in the future
+                self.session_archive_time[sname] = 0
+                self.session_archive_time_grace[sname] = 0
                 continue
             if not self.session_archive_time_grace[sname]:
                 self.session_archive_time_grace[sname] = mtime
@@ -911,8 +917,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                          str(self.IsOk()) +
                          str(self.IsUnlinked()))
         self.title = title
-        if self.cur_icon == path:
-            return
+        # if self.cur_icon == path:
+        #     return
         self.cur_icon = path
         icon = wx.Icon(path)
         self.SetIcon(icon, title)
