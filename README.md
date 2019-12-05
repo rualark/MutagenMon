@@ -1,6 +1,10 @@
 # MutagenMon
 Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a>: monitor sessions status in tray, restart hanging sessions, resolve conflicts
 
+[![Open Source Helpers](https://www.codetriage.com/rualark/mutagenmon/badges/users.svg)](https://www.codetriage.com/rualark/mutagenmon)
+[![BCH compliance](https://bettercodehub.com/edge/badge/rualark/MutagenMon?branch=master)](https://bettercodehub.com/)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/802c129fde624c2390086e9246f29b79)](https://www.codacy.com/manual/rualark/MutagenMon?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=rualark/MutagenMon&amp;utm_campaign=Badge_Grade)
+
 # Features
 
 - MutagenMon starts sessions specified in file `mutagen/mutagen-create.bat` and monitors their status
