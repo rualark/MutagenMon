@@ -15,9 +15,9 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 <img src=https://i.imgur.com/MW5448A.png align=top width=30> Problems detected
 
-<img src=https://i.imgur.com/IO3SHp3.png align=top width=30> Waiting for mutagen daemon to respond
+<img src=https://i.imgur.com/ivH4yKB.png align=top width=30> Waiting for mutagen daemon to respond
 
-<img src=https://i.imgur.com/TL9hQZL.png align=top width=30> Mutagen stopping
+<img src=https://i.imgur.com/wR2LqjK.png align=top width=30> Mutagen stopping
 
 <img src=https://i.imgur.com/jHplJEG.png align=top width=30> Mutagen not running (restarting)
 
