@@ -4,7 +4,7 @@ import queue
 import traceback
 from copy import copy
 
-from .ssh import *
+from .resolve import *
 from .mutagen import *
 from ..local.file import *
 from ..wx.wx import *
@@ -271,7 +271,9 @@ class Monitor(threading.Thread):
             result = re.search(ar['filepath'], fname)
             if result is None:
                 continue
-            resolve(session_status, sname, fname, ar['resolve'], auto=True)
+            imes = info_message('Remote connection...')
+            resolve(session_status, sname, fname, ar['resolve'] + ' (auto)')
+            imes.Destroy()
             conflict['autoresolved'] = True
             est = 'Auto-resolved conflict: ' + ar['resolve']
             append_debug_log(40, est + ' - ' + sname + ':' + fname)
