@@ -1,5 +1,5 @@
-from .run import *
-from .file import *
+from ..local.run import *
+from ..local.file import *
 
 global_session_config = {}
 
@@ -132,4 +132,10 @@ def restart_session(sname):
     stop_session(sname)
     start_session(sname)
 
+
+def get_worst_code(session_code):
+    worst_code = 100
+    for sname in session_config():
+        worst_code = min(worst_code, session_code[sname])
+    return worst_code
 

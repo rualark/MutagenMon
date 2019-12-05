@@ -1,4 +1,5 @@
-from .run import *
+from ..local.run import *
+
 
 def make_diff_path(url, fname, id):
     if ':/' not in url:

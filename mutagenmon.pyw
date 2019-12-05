@@ -4,19 +4,11 @@
 # Optimized for mutagen.io version 0.10
 import wx.adv
 import wx
-import os
 import sys
-import subprocess
-import re
-import traceback
-import queue
-from shutil import copyfile
-import json
-from copy import copy
 
-from mutagenmonlib.file import append_log, load_config, cfg
-from mutagenmonlib.wx import errorBox
-from mutagenmonlib.icon import TaskBarIcon
+from mutagenmonlib.local.file import append_log, load_config, cfg
+from mutagenmonlib.wx.wx import errorBox
+from mutagenmonlib.wx.icon import TaskBarIcon
 
 
 def my_excepthook(exctype, value, tb):

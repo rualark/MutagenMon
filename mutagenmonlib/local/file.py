@@ -3,7 +3,7 @@ import json
 import os
 from shutil import copyfile
 
-from .wx import *
+from ..wx.wx import *
 from .lib import *
 
 config = {}

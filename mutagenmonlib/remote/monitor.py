@@ -6,8 +6,8 @@ from copy import copy
 
 from .ssh import *
 from .mutagen import *
-from .file import *
-from .wx import *
+from ..local.file import *
+from ..wx.wx import *
 
 status_connecting = (
     'Connecting to',
@@ -249,6 +249,7 @@ class Monitor(threading.Thread):
                 del self.auto_resolve_history[sfname]
 
     def auto_resolve(self, conflicts):
+        session_status = self.getStatus()
         self.clean_auto_resolve_history()
         append_debug_log(40, 'ARHistory: ' + str(self.auto_resolve_history))
         now = time.time()
@@ -262,15 +263,14 @@ class Monitor(threading.Thread):
                     continue
                 self.auto_resolve_history[sfname] = (
                     now,
-                    self.auto_resolve_single(sname, conflict, fname))
+                    self.auto_resolve_single(sname, conflict, fname, session_status))
 
-    def auto_resolve_single(self, sname, conflict, fname):
+    def auto_resolve_single(self, sname, conflict, fname, session_status):
         append_debug_log(60, 'Trying to autoresolve ' + sname + ':' + fname)
         for ar in cfg('AUTORESOLVE'):
             result = re.search(ar['filepath'], fname)
             if result is None:
                 continue
-            session_status = self.getStatus()
             resolve(session_status, sname, fname, ar['resolve'], auto=True)
             conflict['autoresolved'] = True
             est = 'Auto-resolved conflict: ' + ar['resolve']
