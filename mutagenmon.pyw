@@ -234,6 +234,13 @@ def create_menu_item(menu, label, func):
     return item
 
 
+def create_menu_item_disabled(menu, label):
+    item = wx.MenuItem(menu, -1, label)
+    item.Enable(False)
+    menu.Append(item)
+    return item
+
+
 def info_message(st):
     d = wx.Dialog(None, style=wx.CAPTION)
     d.SetTitle(st)
@@ -554,7 +561,7 @@ class Monitor(threading.Thread):
             return
         session_status = self.getStatus()
         with self.mutagen_lock:
-            for sname in session_config:
+            for sname in session_status:
                 if not session_status[sname]:
                     continue
                 status = session_status[sname]['status']
@@ -715,6 +722,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.killer = GracefulKiller()
         self.cur_icon = ''
         self.worst_code = 0
+        self.restarting = False
         self.frame = frame
         self.load_session_config()
         self.session_archive_time = init_session_default(0)
@@ -787,14 +795,30 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         if cnames or self.worst_code == 100:
             self.had_conflicts = cnames
 
+    def check_restarting(self):
+        status = self.monitor.getStatus()
+        for sname in status:
+            if status[sname]:
+                return
+        self.restart_process()
+
     def update(self, event):
         if self.exiting:
             return
+        if self.restarting:
+            self.check_restarting()
         self.cycle += 1
         self.check_killer()
         self.update_icon()
         self.get_messages()
         self.notify_conflicts()
+
+    def restart_process(self):
+        self.exiting = True
+        append_log(cfg['LOG_PATH'] + '/error.log', 'Restarting application')
+        # self.notify(self.title, 'Icon crashed. Restarting application')
+        subprocess.Popen(['mutagenmon'], shell=True)
+        self.exit()
 
     def update_icon(self):
         updated_profile = self.check_mutagen_profile_dir()
@@ -901,12 +925,17 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
 
     def CreatePopupMenu(self):
         menu = wx.Menu()
-        create_menu_item(menu, 'Show status', self.on_left_down)
-        if self.monitor.getEnabled():
-            create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
+        if self.restarting:
+            create_menu_item_disabled(menu, 'Restarting...')
         else:
-            create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
-        menu.AppendSeparator()
+            create_menu_item(menu, 'Reload config && restart mutagen', self.on_restart)
+            if self.monitor.getEnabled():
+                create_menu_item(menu, 'Stop Mutagen sessions', self.on_stop)
+            else:
+                create_menu_item(menu, 'Start Mutagen sessions', self.on_start)
+            menu.AppendSeparator()
+            create_menu_item(menu, 'Show status', self.on_left_down)
+            menu.AppendSeparator()
         create_menu_item(menu, 'Exit MutagenMon', self.on_exit)
         return menu
 
@@ -1087,6 +1116,10 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
     def on_stop(self, event):
         append_debug_log(10, 'on_stop')
         self.monitor.DisableMutagen()
+
+    def on_restart(self, event):
+        self.restarting = True
+        self.on_stop(event)
 
     def on_exit(self, event):
         self.exit()
