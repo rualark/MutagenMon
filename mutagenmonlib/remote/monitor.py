@@ -13,8 +13,9 @@ status_connecting = (
     'Connecting to',
     'Waiting to connect',
     'Unknown')
+status_scanning = (
+    'Scanning files')
 status_working = (
-    'Scanning files',
     'Waiting 5 seconds for rescan',
     'Reconciling changes',
     'Staging files on',
@@ -221,6 +222,10 @@ class Monitor(threading.Thread):
             elif status.startswith(status_working):
                 session_err[sname] = 0
                 session_code[sname] = 70
+            # If scanning, set session_code to 65
+            elif status.startswith(status_scanning):
+                session_err[sname] = 0
+                session_code[sname] = 65
             # If there are problems, decrease session_code to 30 if it is greater
             if session_status[sname]['problems']:
                 session_code[sname] = min(session_code[sname], 30)

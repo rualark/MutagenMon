@@ -107,14 +107,29 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
                 if now - session_log_time > cfg('STATUS_MAX_LAG'):
                     self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
                 else:
-                    self.set_icon('img/green.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes')
+                    if updated_profile:
+                        self.set_icon('img/green-success.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (updated)')
+                    else:
+                        self.set_icon('img/green.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes')
             else:
                 self.set_icon('img/green-stop.png', cfg('TRAY_TOOLTIP') + ': mutagen is stopping')
+        elif self.worst_code > 65:
+            if now - session_log_time > cfg('STATUS_MAX_LAG'):
+                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing (stale)')
+            else:
+                if updated_profile:
+                    self.set_icon('img/green-success.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing (updated)')
+                else:
+                    self.set_icon('img/green-sync.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing')
         elif self.worst_code > 60:
             if now - session_log_time > cfg('STATUS_MAX_LAG'):
-                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is scanning (stale)')
             else:
-                self.set_icon('img/green-sync.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing')
+                if updated_profile:
+                    self.set_icon('img/green-success.png',
+                                  cfg('TRAY_TOOLTIP') + ': mutagen is scanning (updated)')
+                else:
+                    self.set_icon('img/green-scan.png', cfg('TRAY_TOOLTIP') + ': mutagen is scanning')
         elif self.worst_code > 30:
             self.set_icon('img/green-conflict.png', cfg('TRAY_TOOLTIP') + ': conflicts')
         elif self.worst_code > 0:
