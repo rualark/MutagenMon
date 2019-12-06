@@ -122,7 +122,11 @@ def get_sessions():
         sname = result.group(1)
         if sname:
             if sname in global_session_config:
-                dlg = wx.MessageDialog(None, sname + ' session name is duplicate in ' + cfg('MUTAGEN_SESSIONS_BAT_FILE'), 'MutagenMon', wx.OK | wx.ICON_INFORMATION)
+                dlg = wx.MessageDialog(
+                    None,
+                    sname + ' session name is duplicate in ' + cfg('MUTAGEN_SESSIONS_BAT_FILE'),
+                    'MutagenMon',
+                    wx.OK | wx.ICON_INFORMATION)
                 dlg.ShowModal()
                 dlg.Destroy()
             global_session_config[sname] = s

@@ -1,10 +1,10 @@
 from ..local.run import *
 
 
-def make_diff_path(url, fname, id):
+def make_diff_path(url, fname, rid):
     if ':/' not in url:
         return dir_and_name(url, fname)
-    lname = 'diff/remote' + str(id)
+    lname = 'diff/remote' + str(rid)
     scp(dir_and_name(url, fname), lname)
     return lname
 

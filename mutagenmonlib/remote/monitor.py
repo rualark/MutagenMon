@@ -180,7 +180,7 @@ class Monitor(threading.Thread):
     def update(self):
         try:
             (session_log, session_status, conflicts) = get_session_status()
-        except Exception as e:
+        except Exception:
             est = traceback.format_exc()
             append_log(cfg('LOG_PATH') + '/error.log', est)
             self.messages.put({

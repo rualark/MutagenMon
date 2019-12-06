@@ -28,13 +28,22 @@ def load_config(fname):
     config['MUTAGEN_PROFILE_DIR'] = config['MUTAGEN_PROFILE_DIR'].replace("%USERPROFILE%", os.getenv("USERPROFILE"))
 
 
-def dir_and_name(dir, name):
-    # dir.replace("\\", '/')
-    if dir[-1:] == '/':
-        dir = dir[:-1]
-    if name[0] == '/':
-        name = name[1:]
-    return dir + '/' + name
+def dir_and_name(dname, fname):
+    # dname = dname.replace("\\", '/')
+    if dname[-1:] == '/':
+        dname = dname[:-1]
+    if fname[0] == '/':
+        fname = fname[1:]
+    return dname + '/' + fname
+
+
+def dir_and_name_local(dname, fname):
+    # dname = dname.replace("/", os.path.sep)
+    if dname[-1:] == os.path.sep:
+        dname = dname[:-1]
+    if fname[0] == os.path.sep:
+        fname = fname[1:]
+    return dname + os.path.sep + fname
 
 
 def write_file(fname, st):

@@ -113,6 +113,9 @@ def resolve_all(session_status, conflicts):
     count = 0
     for sname in conflicts:
         for conflict in conflicts[sname]:
+            # Skip autoresolved conflicts
+            if conflict['autoresolved']:
+                continue
             count += 1
             if count > 100:
                 messageBox(
