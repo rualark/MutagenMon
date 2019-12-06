@@ -1,0 +1,3 @@
+[[analyzers]]
+name = "python"
+enabled = true
