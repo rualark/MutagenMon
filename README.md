@@ -69,3 +69,5 @@ Issue on mutagen: https://github.com/mutagen-io/mutagen/issues/173
 [![Open Source Helpers](https://www.codetriage.com/rualark/mutagenmon/badges/users.svg)](https://www.codetriage.com/rualark/mutagenmon)
 [![BCH compliance](https://bettercodehub.com/edge/badge/rualark/MutagenMon?branch=master)](https://bettercodehub.com/)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/802c129fde624c2390086e9246f29b79)](https://www.codacy.com/manual/rualark/MutagenMon?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=rualark/MutagenMon&amp;utm_campaign=Badge_Grade)
+
+[![DeepSource](https://static.deepsource.io/deepsource-badge-light.svg)](https://deepsource.io/gh/rualark/MutagenMon/?ref=repository-badge)
