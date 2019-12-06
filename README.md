@@ -9,7 +9,11 @@ Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io<
 
 <img src=https://i.imgur.com/mPu7mZq.png align=top width=30> Watching for changes (all ok)
 
-<img src=https://i.imgur.com/TLt1EDe.png align=top width=30> Syncing (scanning, reconciling, staging, applying changes or saving archive)
+<img src=https://i.imgur.com/Kg671Sm.png align=top width=30> Files updated
+
+<img src=https://i.imgur.com/TLt1EDe.png align=top width=30> Syncing (reconciling, staging, applying changes or saving archive)
+
+<img src=https://i.imgur.com/uOzXxHM.png align=top width=30> Scanning files
 
 <img src=https://i.imgur.com/tTMBScq.png align=top width=30> Conflicts detected (but no problems or errors)
 
