@@ -4,10 +4,10 @@ import queue
 import traceback
 from copy import copy
 
-from .resolve import *
-from .mutagen import *
-from ..local.file import *
-from ..wx.wx import *
+from mutagenmonlib.remote.resolve import *
+from mutagenmonlib.remote.mutagen import *
+from mutagenmonlib.local.file import *
+from mutagenmonlib.wx.wx import *
 
 status_connecting = (
     'Connecting to',

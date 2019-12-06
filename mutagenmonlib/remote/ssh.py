@@ -1,4 +1,4 @@
-from ..local.run import *
+from mutagenmonlib.local.run import *
 
 
 def make_diff_path(url, fname, rid):

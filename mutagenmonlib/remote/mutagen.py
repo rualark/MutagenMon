@@ -1,5 +1,5 @@
-from ..local.run import *
-from ..local.file import *
+from mutagenmonlib.local.run import *
+from mutagenmonlib.local.file import *
 
 global_session_config = {}
 

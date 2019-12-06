@@ -1,6 +1,6 @@
 import wx.adv
 
-from .ssh import *
+from mutagenmonlib.remote.ssh import *
 
 
 def resolve(session_status, sname, fname, method, auto=False):

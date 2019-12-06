@@ -1,6 +1,7 @@
 import subprocess
 
-from .file import *
+from mutagenmonlib.local.file import *
+
 
 def run(ca, shell, interactive_error):
     append_debug_log(90, "RUN: " + str(ca))

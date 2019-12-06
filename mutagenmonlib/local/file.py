@@ -3,8 +3,8 @@ import json
 import os
 from shutil import copyfile
 
-from ..wx.wx import *
-from .lib import *
+from mutagenmonlib.wx.wx import *
+from mutagenmonlib.local.lib import *
 
 config = {}
 
