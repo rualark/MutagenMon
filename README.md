@@ -1,5 +1,5 @@
 # MutagenMon
-Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a>: monitor sessions status in tray, restart hanging sessions, resolve conflicts
+Cross-platform GUI for <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> file synchronizer: monitor sessions status in tray, restart hanging sessions, resolve conflicts
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/802c129fde624c2390086e9246f29b79)](https://www.codacy.com/manual/rualark/MutagenMon?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=rualark/MutagenMon&amp;utm_campaign=Badge_Grade)
 
