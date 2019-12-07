@@ -51,9 +51,10 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 
 1. Download and unzip <a href=https://github.com/rualark/MutagenMon/releases>MutagenMon release</a>
 2. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
-3. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
-4. Edit configuration file at `mutagen/config/mutagenmon_config.json`
-5. Run mutagenmon
+3. If you want to use visual diff and merge, download and install winmerge or alternative program, which can take two different files as two parameters.
+4. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
+5. Edit configuration file at `mutagen/config/mutagenmon_config.json`
+6. Run mutagenmon
 
 # Installation from sources
 
@@ -61,9 +62,10 @@ MutagenMon can work on Windows, Linux or Mac (currently tested only on Windows)
 2. Install wxpython: `pip install wxpython`
 3. Download and unzip <a href=https://github.com/rualark/MutagenMon/releases>MutagenMon release</a>
 4. Download <a href=https://github.com/mutagen-io/mutagen>mutagen.io</a> release and put mutagen binary into `mutagen` folder of MutagenMon
-5. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
-6. Edit configuration file at `mutagen/config/mutagenmon_config.json`
-7. Run mutagenmon
+5. If you want to use visual diff and merge, download and install winmerge or alternative program, which can take two different files as two parameters.
+6. Add your sessions to  `mutagen/mutagen-create.bat` file in MutagenMon folder 
+7. Edit configuration file at `mutagen/config/mutagenmon_config.json`
+8. Run mutagenmon
 
 # Limitations
 
