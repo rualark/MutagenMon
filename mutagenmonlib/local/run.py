@@ -11,15 +11,19 @@ def run(ca, shell, interactive_error):
         return res
     except subprocess.CalledProcessError as e:
         est = str(ca) + '\n' + e.output.decode("utf-8")
+        append_log(cfg('LOG_PATH') + '/error.log', est)
         if interactive_error:
             errorBox('MutagenMon error', est)
-        append_log(cfg('LOG_PATH') + '/error.log', est)
+        else:
+            raise e
         return est
     except Exception as e:
         est = str(ca) + '\n' + repr(e)
+        append_log(cfg('LOG_PATH') + '/error.log', est)
         if interactive_error:
             errorBox('MutagenMon error', est)
-        append_log(cfg('LOG_PATH') + '/error.log', est)
+        else:
+            raise e
         return est
 
 

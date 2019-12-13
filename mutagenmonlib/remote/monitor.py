@@ -134,7 +134,11 @@ class Monitor(threading.Thread):
                     continue
                 status = session_status[sname]['status']
                 if status:
-                    stop_session(sname)
+                    try:
+                        stop_session(sname)
+                    except Exception as e:
+                        pass
+
 
     def restart_mutagen(self):
         if not self.getEnabled():
@@ -180,13 +184,13 @@ class Monitor(threading.Thread):
     def update(self):
         try:
             (session_log, session_status, conflicts) = get_session_status()
-        except Exception:
-            est = traceback.format_exc()
-            append_log(cfg('LOG_PATH') + '/error.log', est)
+        except Exception as e:
+            """
             self.messages.put({
                 'type': 'notify',
                 'title': 'Error getting mutagen status',
-                'text': est})
+                'text': repr(e)})
+            """
             return
         self.setStatusLog(session_log)
         session_err = copy(self.getErr())

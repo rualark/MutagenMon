@@ -103,8 +103,12 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         session_log, session_log_time = self.monitor.getStatusLog()
         if self.worst_code > 70 and not updated_profile:
             if self.monitor.getEnabled():
-                if now - session_log_time > cfg('STATUS_MAX_LAG'):
+                if now - session_log_time > cfg('STATUS_MAX_LAG')['Error']:
+                    self.set_icon('img/green-timeout-red.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+                elif now - session_log_time > cfg('STATUS_MAX_LAG')['Warning']:
                     self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+                elif now - session_log_time > cfg('STATUS_MAX_LAG')['Info']:
+                    self.set_icon('img/green-timeout-white.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
                 else:
                     if updated_profile:
                         self.set_icon('img/green-success.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (updated)')
@@ -113,16 +117,24 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             else:
                 self.set_icon('img/green-stop.png', cfg('TRAY_TOOLTIP') + ': mutagen is stopping')
         elif self.worst_code > 65:
-            if now - session_log_time > cfg('STATUS_MAX_LAG'):
-                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing (stale)')
+            if now - session_log_time > cfg('STATUS_MAX_LAG')['Error']:
+                self.set_icon('img/green-timeout-red.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+            elif now - session_log_time > cfg('STATUS_MAX_LAG')['Warning']:
+                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+            elif now - session_log_time > cfg('STATUS_MAX_LAG')['Info']:
+                self.set_icon('img/green-timeout-white.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
             else:
                 if updated_profile:
                     self.set_icon('img/green-success.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing (updated)')
                 else:
                     self.set_icon('img/green-sync.png', cfg('TRAY_TOOLTIP') + ': mutagen is syncing')
         elif self.worst_code > 60:
-            if now - session_log_time > cfg('STATUS_MAX_LAG'):
-                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is scanning (stale)')
+            if now - session_log_time > cfg('STATUS_MAX_LAG')['Error']:
+                self.set_icon('img/green-timeout-red.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+            elif now - session_log_time > cfg('STATUS_MAX_LAG')['Warning']:
+                self.set_icon('img/green-timeout.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
+            elif now - session_log_time > cfg('STATUS_MAX_LAG')['Info']:
+                self.set_icon('img/green-timeout-white.png', cfg('TRAY_TOOLTIP') + ': mutagen is watching for changes (stale)')
             else:
                 if updated_profile:
                     self.set_icon('img/green-success.png',

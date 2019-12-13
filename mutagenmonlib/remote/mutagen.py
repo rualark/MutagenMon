@@ -12,7 +12,7 @@ def mutagen_sync_list():
     st = run(
         [cfg('MUTAGEN_PATH'), 'sync', 'list'],
         shell=True,
-        interactive_error=True)
+        interactive_error=False)
     st = st.replace('Attempting to start Mutagen daemon...', '')
     st = st.replace('Started Mutagen daemon in background (terminate with "mutagen daemon stop")', '')
     st = st.replace('\n\t', '\n    ')
@@ -133,8 +133,14 @@ def get_sessions():
 
 
 def restart_session(sname):
-    stop_session(sname)
-    start_session(sname)
+    try:
+        stop_session(sname)
+    except Exception as e:
+        pass
+    try:
+        start_session(sname)
+    except Exception as e:
+        pass
 
 
 def get_worst_code(session_code):
