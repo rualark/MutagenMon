@@ -75,7 +75,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         for sname in status:
             if status[sname]:
                 return
-        self.restart_process()
+        self.restart_process('manual restart')
 
     def update(self, event):
         if self.exiting:
@@ -88,9 +88,11 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.get_messages()
         self.notify_conflicts()
 
-    def restart_process(self):
+    def restart_process(self, cause):
+        if (self.exiting):
+            return
         self.exiting = True
-        append_log(cfg('LOG_PATH') + '/error.log', 'Restarting application')
+        append_log(cfg('LOG_PATH') + '/error.log', 'Restarting application: ' + cause)
         # self.notify(self.title, 'Icon crashed. Restarting application')
         subprocess.Popen(['mutagenmon'], shell=True)
         self.exit()
@@ -101,6 +103,8 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         self.worst_code = get_worst_code(self.monitor.getCode())
         now = time.time()
         session_log, session_log_time = self.monitor.getStatusLog()
+        if now - session_log_time > cfg('STATUS_MAX_LAG')['Restart']:
+            self.restart_process('status frozen')
         if self.worst_code > 70 and not updated_profile:
             if self.monitor.getEnabled():
                 if now - session_log_time > cfg('STATUS_MAX_LAG')['Error']:

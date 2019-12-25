@@ -38,7 +38,7 @@ class Monitor(threading.Thread):
         self.conflicts = init_session_list()
         self.session_code = init_session_default(0)
         self.status_log = ''
-        self.status_log_time = 0
+        self.status_log_time = time.time()
         self.auto_resolve_history = {}
         self.messages = queue.Queue()
         threading.Thread.__init__(self)

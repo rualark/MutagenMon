@@ -45,8 +45,8 @@
 # Number of milliseconds to wait between polling "mutagen sync list"
 "MUTAGEN_POLL_PERIOD": 1000,
 
-# Numer of seconds to allow for status lag before changing tray icon to "stale"
-"STATUS_MAX_LAG": {"Info": 4, "Warning": 15, "Error": 50},
+# Numer of seconds to allow for status lag before changing tray icon to "stale" and restart MutagenMon
+"STATUS_MAX_LAG": {"Info": 4, "Warning": 15, "Error": 50, "Restart": 90},
 
 # Set to mutagen directory with caches and archives
 "MUTAGEN_PROFILE_DIR": "%USERPROFILE%\\.mutagen",
