@@ -225,14 +225,14 @@ class Monitor(threading.Thread):
             # If working, set session_code to 70
             elif status.startswith(status_working):
                 session_err[sname] = 0
-                session_code[sname] = 70
+                session_code[sname] = 40
             # If scanning, set session_code to 65
             elif status.startswith(status_scanning):
                 session_err[sname] = 0
-                session_code[sname] = 65
+                session_code[sname] = 30
             # If there are problems, decrease session_code to 30 if it is greater
             if session_status[sname]['problems']:
-                session_code[sname] = min(session_code[sname], 30)
+                session_code[sname] = min(session_code[sname], 50)
             # If there are conflicts, decrease session_code to 60 if it is greater
             if session_status[sname]['conflicts']:
                 session_code[sname] = min(session_code[sname], 60)
