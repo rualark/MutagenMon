@@ -52,7 +52,7 @@ def visual_merge(sname, fname, session_status):
         return False
 
 
-def resolve_single(sname, conflict, session_status):
+def resolve_single(sname, conflict, session_status, count, total):
     fname = conflict['aname']
     ftime1 = ''
     fsize1 = ''
@@ -82,7 +82,7 @@ def resolve_single(sname, conflict, session_status):
     dlg = wx.SingleChoiceDialog(
         None,
         st,
-        'MutagenMon: resolve file conflict',
+        'MutagenMon: resolve file conflict ' + str(count) + ' of ' + str(total),
         ['Visual merge', 'A wins', 'B wins'],
         style=wx.DEFAULT_DIALOG_STYLE | wx.OK | wx.CANCEL | wx.CENTRE | wx.OK_DEFAULT)
     if ftime1t > ftime2t:
@@ -122,7 +122,7 @@ def resolve_all(session_status, conflicts):
                     'MutagenMon: resolve file conflict',
                     "Too many conflicts. You can restart resolving or resolve manually")
                 return
-            while not resolve_single(sname, conflict, session_status):
+            while not resolve_single(sname, conflict, session_status, count, len(conflicts)):
                 pass
 
 

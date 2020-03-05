@@ -92,13 +92,13 @@ def get_session_status():
             session_status[name]['conflicts'] = 1
         if s.startswith('Problems:'):
             session_status[name]['problems'] = 1
-        if s.startswith('(α) '):
+        if s.startswith('(alpha) '):
             pos = get_matching_open_parenth(s, len(s) - 1)
-            aname = s[4:pos - 1]
+            aname = s[8:pos - 1]
             astate = s[pos + 1:]
-        if s.startswith('(β) '):
+        if s.startswith('(beta) '):
             pos = get_matching_open_parenth(s, len(s) - 1)
-            bname = s[4:pos - 1]
+            bname = s[8:pos - 1]
             bstate = s[pos + 1:]
             conflicts[name].append({
                 'aname': aname,
